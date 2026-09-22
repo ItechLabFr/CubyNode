@@ -13,8 +13,12 @@ DEFAULT_SWAP_MB=512
 [[ "${EUID}" -eq 0 ]] || { echo "Run this installer as root on the Proxmox VE host." >&2; exit 1; }
 for cmd in pct pvesm pveam pvesh curl; do command -v "$cmd" >/dev/null || { echo "Missing Proxmox command: $cmd" >&2; exit 1; }; done
 
-GITHUB_TOKEN="${CUBYNODE_GITHUB_TOKEN:-}"
-if [[ -z "$GITHUB_TOKEN" ]]; then
+GITHUB_TOKEN=""
+if [[ -n "${CUBYNODE_GITHUB_TOKEN_FILE:-}" && -r "$CUBYNODE_GITHUB_TOKEN_FILE" ]]; then
+  GITHUB_TOKEN="$(cat "$CUBYNODE_GITHUB_TOKEN_FILE")"
+elif [[ -n "${CUBYNODE_GITHUB_TOKEN:-}" ]]; then
+  GITHUB_TOKEN="$CUBYNODE_GITHUB_TOKEN"
+else
   read -r -s -p "GitHub token for $OWNER/$REPO: " GITHUB_TOKEN
   echo
 fi
