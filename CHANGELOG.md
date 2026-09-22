@@ -16,3 +16,7 @@ The project follows Semantic Versioning.
 - Confirmed that Docker and LXC are independent runtimes; Docker is not required inside LXC workloads.
 - Defined the initial control-plane, node-agent and scheduler architecture.
 - Added the provisional runtime-neutral logo and branding direction.
+- Added automatic native Proxmox VE LXC installation from GitHub.
+- Added a native LXC bootstrap with Node.js 24, PostgreSQL and systemd services.
+- Added admin-panel simple and complete update flows.
+- Added application rollback for failed native code updates.
