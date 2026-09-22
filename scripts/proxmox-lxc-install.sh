@@ -84,7 +84,6 @@ pct exec "$CTID" -- bash -lc 'getent hosts github.com >/dev/null 2>&1' || { echo
 
 TMP_BOOTSTRAP="/tmp/cubynode-lxc-bootstrap-$CTID.sh"
 TMP_TOKEN="/tmp/cubynode-github-token-$CTID"
-trap 'rm -f "$TMP_BOOTSTRAP" "$TMP_TOKEN" "$AUTH_HEADER_FILE"' EXIT
 github_raw "scripts/lxc-bootstrap.sh" "$TMP_BOOTSTRAP"
 printf '%s' "$GITHUB_TOKEN" >"$TMP_TOKEN"; chmod 0600 "$TMP_TOKEN"
 
