@@ -71,7 +71,7 @@ export class DockerDriver {
         id: container.Id,
         externalId: container.Id,
         runtime: 'docker',
-        kind: iabels['cubynode.kind'] || 'unknown',
+        kind: labels['cubynode.kind'] || 'unknown',
         name,
         status: normalizeDockerStatus(container.State),
         statusDetail: container.Status ?? null,
