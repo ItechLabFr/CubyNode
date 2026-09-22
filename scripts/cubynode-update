@@ -68,7 +68,7 @@ rollback() {
   if [[ "$ROLLBACK_NEEDED" == "1" && -n "$BEFORE" ]]; then
     echo "Update failed; rolling application tree back to $BEFORE"
     runuser -u cubynode -- git -C "$REPO_DIR" reset --hard "$BEFORE" || true
-    runuser -u cubynode -- npm --prefix "$REPO_DIR" install --omit=dev --no-audit --no-fund || true
+    runuser -u cubynode -- npm --prefix "$REPO_DIR" install --omit=dev --no-audit --no-fund --package-lock=false || true
     systemctl restart cubynode-agent.service || true
     systemctl restart cubynode-api.service || true
   fi
@@ -97,7 +97,7 @@ fi
 
 ROLLBACK_NEEDED=1
 runuser -u cubynode -- git -C "$REPO_DIR" reset --hard "origin/$CHANNEL"
-runuser -u cubynode -- npm --prefix "$REPO_DIR" install --omit=dev --no-audit --no-fund
+runuser -u cubynode -- npm --prefix "$REPO_DIR" install --omit=dev --no-audit --no-fund --package-lock=false
 runuser -u cubynode -- npm --prefix "$REPO_DIR" run check
 
 if [[ "$MODE" == "full" ]]; then
