@@ -4,60 +4,111 @@
 
 **Current version: `1.0.0-beta.1`**
 
-CubyNode is a self-hosted control plane focused on exactly two workload families:
+CubyNode is a self-hosted control plane dedicated to:
 
 - Minecraft servers
 - Discord bots
 
-It supports two independent execution backends:
+Execution backends remain independent:
 
-- **Docker Engine**
-- **Incus/LXC** (Docker is not required inside LXC)
+- Docker Engine
+- LXC/Incus
 
-## beta.1 status
+The control plane itself can now be installed **natively in a Proxmox VE LXC without Docker**.
 
-The beta.1 implementation provides a functional vertical slice:
+## Automatic Proxmox LXC installation
 
-- responsive light/dark dashboard
-- token-protected control-plane API
-- PostgreSQL persistence
-- multi-node agent synchronization
-- real host CPU/RAM/storage telemetry
-- Docker discovery/stats/logs/start/stop/restart
-- Incus/LXC discovery/state/start/stop/restart
-- real activity log from observed runtime changes
-- one real Docker demo workload
-- no synthetic dashboard values
+Run this as `root` on the Proxmox VE host:
 
-### Data policy
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/ItechLabFr/CubyNode/main/scripts/proxmox-lxc-install.sh)
+```
 
-The only intentionally synthetic workload shipped with beta.1 is **Demo Minecraft** in `compose.yaml`.
+The installer automatically handles:
 
-Every value displayed by the UI comes from the agent/runtime or from PostgreSQL history built from those observations. When data does not exist, the UI displays an empty or collecting state.
+- next available CTID
+- hostname
+- unprivileged LXC
+- bridge / DHCP networking
+- 2 vCPU
+- 2 GB RAM
+- 512 MB swap
+- latest Debian 13 standard template by default
+- template download
+- Node.js 24
+- PostgreSQL
+- CubyNode clone from GitHub
+- systemd services
+- panel + agent tokens
+- startup on boot
+- native updater
 
-## Quick start
+The only interactive choices are:
 
-Requirements: Linux, Docker Engine, Docker Compose v2.
+1. template storage
+2. LXC root-disk storage
+3. LXC disk size
+
+If only one compatible storage exists, it is selected automatically.
+
+The final URL and panel token are printed at the end and stored inside the LXC at:
+
+```text
+/root/cubynode-credentials
+```
+
+See [docs/proxmox-lxc.md](docs/proxmox-lxc.md).
+
+## Admin updates
+
+Native LXC installations expose update controls in **Admin → Mises à jour**.
+
+### Simple update
+
+- fetch the configured GitHub channel
+- update the CubyNode source tree
+- install production npm dependencies
+- run syntax/check validation
+- restart the CubyNode agent and API
+- rollback the application tree if the update fails
+
+### Complete update
+
+Includes the simple update plus:
+
+- `apt update`
+- Debian distribution package upgrade
+- required package refresh
+- systemd service refresh
+- updater helper refresh
+
+If Debian reports that a reboot is required, the panel records that state; the installer does not reboot the LXC automatically.
+
+The updater runs as a transient root systemd unit. The web API itself does not receive an unrestricted root shell.
+
+## Data policy
+
+CubyNode does not seed fake dashboard statistics.
+
+Every node, workload, state, CPU/RAM/storage value, log and activity item displayed by the panel comes from a runtime/agent observation or from PostgreSQL history built from those observations.
+
+The Docker Compose development setup contains one intentional demo workload named `Demo Minecraft`. It is a real Docker container and is the only synthetic workload shipped with beta.1.
+
+## Docker Compose development install
+
+For development/testing on a Docker host:
 
 ```bash
 git clone https://github.com/ItechLabFr/CubyNode.git
 cd CubyNode
 cp .env.example .env
-# Replace all placeholder secrets
+# replace placeholder secrets
 docker compose up -d --build
 ```
 
-Or:
+## Managed workloads
 
-```bash
-./scripts/install.sh
-```
-
-Open `http://HOST:8080` and enter `CUBYNODE_PANEL_TOKEN`.
-
-## Runtime ownership
-
-Docker workloads must carry:
+Docker labels:
 
 ```text
 cubynode.managed=true
@@ -65,22 +116,12 @@ cubynode.kind=minecraft | discord_bot
 cubynode.name=...
 ```
 
-Incus/LXC instances use:
+Incus instance config:
 
 ```text
 user.cubynode.managed=true
 user.cubynode.kind=minecraft | discord_bot
 user.cubynode.name=...
-```
-
-## Incus/LXC
-
-Incus is an independent runtime. Docker is not required in the LXC instance.
-
-Mount the Incus Unix socket into the agent and set:
-
-```env
-CUBYNODE_INCUS_SOCKET=/var/lib/incus/unix.socket
 ```
 
 ## Multi-node
@@ -93,10 +134,17 @@ Each agent needs a unique `CUBYNODE_NODE_ID`.
 
 ## Development
 
+Node.js 24+:
+
 ```bash
 npm install
 npm run check
 npm test
 ```
 
-See [docs/architecture.md](docs/architecture.md) and [docs/beta1.md](docs/beta1.md).
+Documentation:
+
+- [Architecture](docs/architecture.md)
+- [Beta 1 contract](docs/beta1.md)
+- [Proxmox LXC installation](docs/proxmox-lxc.md)
+- [Branding](docs/branding.md)

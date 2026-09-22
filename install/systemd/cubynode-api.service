@@ -1,0 +1,22 @@
+[Unit]
+Description=CubyNode Control Plane API
+After=network-online.target postgresql.service cubynode-agent.service
+Wants=network-online.target
+Requires=postgresql.service cubynode-agent.service
+
+[Service]
+Type=simple
+User=cubynode
+Group=cubynode
+WorkingDirectory=/opt/cubynode
+EnvironmentFile=/etc/cubynode/cubynode.env
+ExecStart=/usr/bin/node /opt/cubynode/apps/api/src/server.mjs
+Restart=on-failure
+RestartSec=3
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/lib/cubynode /var/log/cubynode
+
+[Install]
+WantedBy=multi-user.target

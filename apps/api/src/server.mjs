@@ -8,6 +8,7 @@ import { AgentClient } from './agent-client.mjs';
 import { addActivity, createPool, initDatabase, waitForDatabase } from './db.mjs';
 import { getOverview, getWorkload } from './queries.mjs';
 import { NodeSynchronizer } from './sync.mjs';
+import { getUpdateStatus, triggerUpdate } from './update-service.mjs';
 
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
 const publicDir=path.resolve(__dirname,'../public');
@@ -51,6 +52,17 @@ function fail(res,error){
   console.error(error);
   json(res,Number(error.statusCode)||500,{error:error.message||'internal_error'});
 }
+async function readJsonBody(req,maxBytes=16384){
+  const chunks=[]; let size=0;
+  for await(const chunk of req){
+    size+=chunk.length;
+    if(size>maxBytes){const error=new Error('request_too_large');error.statusCode=413;throw error}
+    chunks.push(chunk);
+  }
+  if(!chunks.length) return {};
+  try{return JSON.parse(Buffer.concat(chunks).toString('utf8'))}
+  catch{const error=new Error('invalid_json');error.statusCode=400;throw error}
+}
 async function routeApi(req,res,url){
   if(req.method==='GET'&&url.pathname==='/api/version') return json(res,200,{version});
   if(req.method==='GET'&&url.pathname==='/api/health') return json(res,200,{ok:true,service:'cubynode-api',version});
@@ -60,6 +72,15 @@ async function routeApi(req,res,url){
   if(req.method==='POST'&&url.pathname==='/api/sync'){
     await Promise.all(synchronizers.map(s=>s.sync()));
     return json(res,202,{accepted:true});
+  }
+  if(req.method==='GET'&&url.pathname==='/api/admin/update/status'){
+    return json(res,200,await getUpdateStatus({version}));
+  }
+  if(req.method==='POST'&&url.pathname==='/api/admin/update'){
+    const body=await readJsonBody(req);
+    const result=await triggerUpdate(body.mode);
+    await addActivity(pool,{eventType:'system.update_requested',message:`${body.mode} update requested from admin panel`,details:{mode:body.mode}});
+    return json(res,202,result);
   }
   const m=url.pathname.match(/^\/api\/workloads\/(.+?)\/(logs|start|stop|restart)$/);
   if(m){
