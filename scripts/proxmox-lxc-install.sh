@@ -157,11 +157,13 @@ confirm_install() {
 }
 
 progress() {
-  local percent="$1" title="$2"
+  local percent="$1" title="$2" filled empty bar
+  filled=$((percent/5)); empty=$((20-filled))
+  bar="$(printf '%*s' "$filled" '' | tr ' ' '█')$(printf '%*s' "$empty" '' | tr ' ' '░')"
   if $TUI; then
-    printf '%s\n' "$percent" | whiptail --title "CubyNode • Installation" --gauge "$title" 9 72 0
+    whiptail --title "CubyNode • Installation" --infobox "$title\n\n[$bar]  $percent%" 10 72
   else
-    printf '      %s✓%s %s\n' "$GREEN" "$RESET" "$title"
+    printf '      %s✓%s %-34s %3s%%\n' "$GREEN" "$RESET" "$title" "$percent"
   fi
 }
 
