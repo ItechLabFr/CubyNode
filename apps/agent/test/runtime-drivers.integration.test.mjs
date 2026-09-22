@@ -15,11 +15,12 @@ function tempSocket(name) {
 function listenUnix(server, socket) {
   return new Promise((resolve, reject) => {
     server.once('error', reject);
-    server.listen(socket, resolve);
+    server.listen(socket, () => { server.unref(); resolve(); });
   });
 }
 
 function close(server, dir) {
+  server.closeAllConnections?.();
   return new Promise((resolve) => server.close(() => {
     fs.rmSync(dir, { recursive: true, force: true });
     resolve();
