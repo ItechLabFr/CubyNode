@@ -58,6 +58,7 @@ The OS template is selected automatically. The preferred template is the newest 
 - swap: 512 MB
 - networking: first `vmbr*` bridge + DHCP
 - unprivileged container: enabled
+- nesting: enabled before first boot (required by modern systemd in current Debian LXC templates)
 - start at boot: enabled
 
 ## Installation inside the LXC
@@ -219,3 +220,30 @@ GitHub host keys are pinned in:
 ```
 
 Future **Simple** and **Complete** updates use the Deploy Key through the repository's `core.sshCommand` configuration. No PAT is required by the running panel.
+
+
+## systemd 257 / nesting
+
+Current Debian 13 LXC templates use a recent systemd. CubyNode creates the container with:
+
+```text
+features: nesting=1
+```
+
+before the first boot.
+
+This avoids the Proxmox startup failure:
+
+```text
+WARN: Systemd 257 detected. You may need to enable nesting.
+TASK ERROR: startup for container '<CTID>' failed
+```
+
+For a container already created without nesting:
+
+```bash
+pct set <CTID> --features nesting=1
+pct start <CTID>
+```
+
+The installer intentionally does not enable `keyctl=1` because Docker is not required inside the CubyNode control-plane LXC.
