@@ -2,13 +2,40 @@
 
 CubyNode can run natively inside a Proxmox VE LXC. Docker is **not** required inside this control-plane LXC.
 
-## One-line install
+## Private-repository install
+
+While `ItechLabFr/CubyNode` is private, the installer needs a temporary fine-grained PAT for the initial bootstrap.
+
+Repository access:
+
+- selected repository: `ItechLabFr/CubyNode`
+- Contents: Read-only
+- Administration: Read and write
+
+The Administration permission is used only to register a **read-only Deploy Key** through GitHub's repository deploy-key API. After that, the PAT is removed from the LXC.
 
 Execute on the Proxmox VE host as root:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/ItechLabFr/CubyNode/main/scripts/proxmox-lxc-install.sh)
+read -r -s -p "GitHub token: " TOKEN; echo
+TOKEN_FILE="$(mktemp /tmp/cubynode-token.XXXXXX)"
+AUTH_FILE="$(mktemp /tmp/cubynode-auth.XXXXXX)"
+chmod 600 "$TOKEN_FILE" "$AUTH_FILE"
+printf '%s' "$TOKEN" >"$TOKEN_FILE"
+printf 'Authorization: Bearer %s\n' "$TOKEN" >"$AUTH_FILE"
+unset TOKEN
+
+CUBYNODE_GITHUB_TOKEN_FILE="$TOKEN_FILE" \
+bash <(curl -fsSL \
+  -H @"$AUTH_FILE" \
+  -H "Accept: application/vnd.github.raw+json" \
+  -H "X-GitHub-Api-Version: 2026-03-10" \
+  "https://api.github.com/repos/ItechLabFr/CubyNode/contents/scripts/proxmox-lxc-install.sh?ref=main")
+
+rm -f "$TOKEN_FILE" "$AUTH_FILE"
 ```
+
+The token is never stored in the Git remote URL.
 
 ## What the installer asks
 
@@ -40,6 +67,7 @@ The bootstrap installs:
 - ca-certificates
 - curl
 - git
+- openssh-client
 - sudo
 - PostgreSQL
 - Python 3 (used by the root update helper)
@@ -151,3 +179,43 @@ cat /var/log/cubynode/update.log
 - PostgreSQL listens locally by default.
 - The update helper is root-owned and validates the update mode.
 - No Docker socket is required for the control-plane LXC.
+
+
+## Private GitHub authentication lifecycle
+
+During initial install:
+
+```text
+temporary PAT
+   ↓
+private Git clone over HTTPS
+   ↓
+generate Ed25519 key inside LXC
+   ↓
+POST read-only Deploy Key to GitHub
+   ↓
+switch origin to git@github.com:ItechLabFr/CubyNode.git
+   ↓
+delete temporary PAT
+```
+
+The persistent private key is stored at:
+
+```text
+/var/lib/cubynode/github_deploy_key
+```
+
+Permissions:
+
+```text
+owner: cubynode
+mode: 0600
+```
+
+GitHub host keys are pinned in:
+
+```text
+/etc/cubynode/github_known_hosts
+```
+
+Future **Simple** and **Complete** updates use the Deploy Key through the repository's `core.sshCommand` configuration. No PAT is required by the running panel.
