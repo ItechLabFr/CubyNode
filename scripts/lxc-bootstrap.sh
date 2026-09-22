@@ -18,8 +18,15 @@ KNOWN_HOSTS="$ENV_DIR/github_known_hosts"
 [[ "${EUID}" -eq 0 ]] || { echo "This bootstrap must run as root inside the LXC." >&2; exit 1; }
 [[ -s "$TOKEN_FILE" ]] || { echo "Temporary GitHub token file is missing." >&2; exit 1; }
 GITHUB_TOKEN="$(cat "$TOKEN_FILE")"
+TOKEN_HEADER_FILE="$(mktemp /root/.cubynode-github-header.XXXXXX)"
+GIT_AUTH_CONFIG="$(mktemp /tmp/cubynode-git-auth.XXXXXX)"
+chmod 0600 "$TOKEN_HEADER_FILE" "$GIT_AUTH_CONFIG"
+printf 'Authorization: Bearer %s\n' "$GITHUB_TOKEN" >"$TOKEN_HEADER_FILE"
 
-cleanup_token(){ unset GITHUB_TOKEN; shred -u "$TOKEN_FILE" 2>/dev/null || rm -f "$TOKEN_FILE"; }
+cleanup_token(){
+  unset GITHUB_TOKEN
+  shred -u "$TOKEN_FILE" "$TOKEN_HEADER_FILE" "$GIT_AUTH_CONFIG" 2>/dev/null || rm -f "$TOKEN_FILE" "$TOKEN_HEADER_FILE" "$GIT_AUTH_CONFIG"
+}
 trap cleanup_token EXIT
 
 export DEBIAN_FRONTEND=noninteractive
@@ -38,7 +45,9 @@ install -d -o root -g cubynode -m 0750 "$ENV_DIR" "$STATE_DIR" "$LOG_DIR"
 # Clone the private repository using an ephemeral HTTP Authorization header.
 rm -rf "$INSTALL_DIR"
 install -d -o cubynode -g cubynode -m 0755 "$INSTALL_DIR"
-runuser -u cubynode -- git -c "http.extraHeader=Authorization: Bearer $GITHUB_TOKEN" clone --branch "$CHANNEL" --single-branch "$REPO_HTTPS" "$INSTALL_DIR"
+git config -f "$GIT_AUTH_CONFIG" http.extraHeader "Authorization: Bearer $GITHUB_TOKEN"
+chown cubynode:cubynode "$GIT_AUTH_CONFIG"
+runuser -u cubynode -- git -c "include.path=$GIT_AUTH_CONFIG" clone --branch "$CHANNEL" --single-branch "$REPO_HTTPS" "$INSTALL_DIR"
 
 # Generate a dedicated read-only SSH deploy key for all future Git operations.
 ssh-keygen -q -t ed25519 -N '' -C "cubynode-$(hostname)" -f "$DEPLOY_KEY"
