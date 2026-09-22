@@ -1,0 +1,89 @@
+name: cubynode
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - cubynode-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  agent:
+    build:
+      context: .
+      dockerfile: docker/agent.Dockerfile
+    restart: unless-stopped
+    environment:
+      CUBYNODE_AGENT_TOKEN: ${CUBYNODE_AGENT_TOKEN}
+      CUBYNODE_NODE_ID: ${CUBYNODE_NODE_ID:-local-node}
+      CUBYNODE_NODE_NAME: ${CUBYNODE_NODE_NAME:-Local node}
+      CUBYNODE_AGENT_PORT: 8081
+      CUBYNODE_DOCKER_SOCKET: /var/run/docker.sock
+      CUBYNODE_METRICS_ROOT: /host
+      # Mount an Incus Unix socket separately on hosts that provide Incus/LXC:
+      # CUBYNODE_INCUS_SOCKET: /var/lib/incus/unix.socket
+    pid: host
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /:/host:ro
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8081/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      CUBYNODE_PANEL_TOKEN: ${CUBYNODE_PANEL_TOKEN}
+      CUBYNODE_AGENT_TOKEN: ${CUBYNODE_AGENT_TOKEN}
+      CUBYNODE_AGENT_URLS: http://agent:8081
+      CUBYNODE_API_PORT: 8080
+      CUBYNODE_SYNC_INTERVAL_MS: 5000
+      CUBYNODE_VERSION: 1.0.0-beta.1
+    ports:
+      - "${CUBYNODE_HTTP_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      agent:
+        condition: service_healthy
+
+  # The only intentionally synthetic workload shipped with beta.1.
+  # It is a real Docker container and all status/log/resource data shown by the panel
+  # comes from Docker Engine rather than a mocked API response.
+  demo-minecraft:
+    image: alpine:3.22
+    restart: unless-stopped
+    command:
+      - /bin/sh
+      - -c
+      - |
+        echo "[demo] CubyNode demo Minecraft workload booting"
+        n=0
+        while true; do
+          n=$$((n+1))
+          echo "[demo] heartbeat $$n"
+          sleep 15
+        done
+    labels:
+      cubynode.managed: "true"
+      cubynode.demo: "true"
+      cubynode.kind: "minecraft"
+      cubynode.name: "Demo Minecraft"
+      cubynode.template: "demo"
+
+volumes:
+  cubynode-postgres:
