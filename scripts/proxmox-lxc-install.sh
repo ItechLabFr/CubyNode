@@ -19,6 +19,7 @@ choose() {
   local prompt="$1"; shift
   local options=("$@")
   [[ "${#options[@]}" -gt 0 ]] || { echo "No option available for: $prompt" >&2; exit 1; }
+  if [[ "${#options[@]}" -eq 1 ]]; then printf '%s' "${options[0]}"; return; fi
   echo >&2
   echo "$prompt" >&2
   local i
@@ -41,7 +42,11 @@ pveam update >/dev/null
 mapfile -t AVAILABLE_TEMPLATES < <(pveam available --section system 2>/dev/null | awk '$1=="system"{print $2}' | grep -E '^(debian-(12|13)-standard|ubuntu-24\.04-standard)_' | sort -Vr)
 [[ "${#AVAILABLE_TEMPLATES[@]}" -gt 0 ]] || { echo "No supported Debian/Ubuntu LXC template found." >&2; exit 1; }
 LXC_TEMPLATE="${CUBYNODE_LXC_TEMPLATE:-}"
-[[ -n "$LXC_TEMPLATE" ]] || LXC_TEMPLATE="$(choose "Template LXC" "${AVAILABLE_TEMPLATES[@]}")"
+if [[ -z "$LXC_TEMPLATE" ]]; then
+  LXC_TEMPLATE="$(printf '%s\n' "${AVAILABLE_TEMPLATES[@]}" | grep '^debian-13-standard_' | head -n1 || true)"
+  [[ -n "$LXC_TEMPLATE" ]] || LXC_TEMPLATE="${AVAILABLE_TEMPLATES[0]}"
+fi
+echo "Template selected automatically: $LXC_TEMPLATE"
 
 if ! pveam list "$TEMPLATE_STORAGE" 2>/dev/null | awk 'NR>1{print $1}' | grep -Fq "vztmpl/$LXC_TEMPLATE"; then
   echo "Downloading $LXC_TEMPLATE to $TEMPLATE_STORAGE..."
