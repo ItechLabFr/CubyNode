@@ -80,7 +80,7 @@ pct exec "$CTID" -- bash -lc 'getent hosts github.com >/dev/null 2>&1' || { echo
 
 TMP_BOOTSTRAP="/tmp/cubynode-lxc-bootstrap-$CTID.sh"
 TMP_TOKEN="/tmp/cubynode-github-token-$CTID"
-trap 'rm -f "$TMP_BOOTSTRAP" "$TMP_TOKEN"' EXIT
+trap 'rm -f "$TMP_BOOTSTRAP" "$TMP_TOKEN" "$AUTH_HEADER_FILE"' EXIT
 github_raw "scripts/lxc-bootstrap.sh" "$TMP_BOOTSTRAP"
 printf '%s' "$GITHUB_TOKEN" >"$TMP_TOKEN"; chmod 0600 "$TMP_TOKEN"
 
@@ -89,7 +89,7 @@ pct push "$CTID" "$TMP_TOKEN" /root/.cubynode-github-token --perms 0600
 
 # Drop the token from the Proxmox process environment before executing in the CT.
 unset CUBYNODE_GITHUB_TOKEN GITHUB_TOKEN
-rm -f "$TMP_TOKEN"
+rm -f "$TMP_TOKEN" "$AUTH_HEADER_FILE"
 
 echo "Installing CubyNode inside the LXC..."
 pct exec "$CTID" -- env CUBYNODE_UPDATE_CHANNEL="$CHANNEL" bash /root/cubynode-bootstrap.sh
