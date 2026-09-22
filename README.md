@@ -18,11 +18,33 @@ The control plane itself can now be installed **natively in a Proxmox VE LXC wit
 
 ## Automatic Proxmox LXC installation
 
-Run this as `root` on the Proxmox VE host:
+The repository is currently private. Use a temporary **fine-grained GitHub PAT** restricted to `ItechLabFr/CubyNode` with:
+
+- **Contents: Read-only**
+- **Administration: Read and write** (only needed so the installer can register the permanent read-only Deploy Key)
+
+Run as `root` on the Proxmox VE host:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/ItechLabFr/CubyNode/main/scripts/proxmox-lxc-install.sh)
+read -r -s -p "GitHub token: " TOKEN; echo
+TOKEN_FILE="$(mktemp /tmp/cubynode-token.XXXXXX)"
+AUTH_FILE="$(mktemp /tmp/cubynode-auth.XXXXXX)"
+chmod 600 "$TOKEN_FILE" "$AUTH_FILE"
+printf '%s' "$TOKEN" >"$TOKEN_FILE"
+printf 'Authorization: Bearer %s\n' "$TOKEN" >"$AUTH_FILE"
+unset TOKEN
+
+CUBYNODE_GITHUB_TOKEN_FILE="$TOKEN_FILE" \
+bash <(curl -fsSL \
+  -H @"$AUTH_FILE" \
+  -H "Accept: application/vnd.github.raw+json" \
+  -H "X-GitHub-Api-Version: 2026-03-10" \
+  "https://api.github.com/repos/ItechLabFr/CubyNode/contents/scripts/proxmox-lxc-install.sh?ref=main")
+
+rm -f "$TOKEN_FILE" "$AUTH_FILE"
 ```
+
+The PAT is used only for the initial private-repository bootstrap. The installer generates an **Ed25519 read-only Deploy Key**, registers it on GitHub, switches the repository remote to SSH, then deletes the temporary PAT from the LXC. Future panel updates use only the Deploy Key.
 
 The installer automatically handles:
 
@@ -37,7 +59,8 @@ The installer automatically handles:
 - template download
 - Node.js 24
 - PostgreSQL
-- CubyNode clone from GitHub
+- authenticated clone from the private GitHub repository
+- dedicated read-only GitHub Deploy Key for future updates
 - systemd services
 - panel + agent tokens
 - startup on boot

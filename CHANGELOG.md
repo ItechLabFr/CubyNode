@@ -20,3 +20,4 @@ The project follows Semantic Versioning.
 - Added a native LXC bootstrap with Node.js 24, PostgreSQL and systemd services.
 - Added admin-panel simple and complete update flows.
 - Added application rollback for failed native code updates.
+- Added private GitHub bootstrap using a temporary fine-grained PAT and persistent read-only Deploy Key.
