@@ -83,7 +83,7 @@ if [[ "$MODE" == "full" ]]; then
   export DEBIAN_FRONTEND=noninteractive
   apt-get update
   apt-get -y dist-upgrade
-  apt-get install -y ca-certificates curl git sudo postgresql openssl python3 util-linux
+  apt-get install -y ca-certificates curl git openssh-client sudo postgresql openssl python3 util-linux
 fi
 
 echo "Fetching CubyNode channel: $CHANNEL"
