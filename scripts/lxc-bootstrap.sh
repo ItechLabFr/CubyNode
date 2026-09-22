@@ -26,21 +26,21 @@ fi
 systemctl enable --now postgresql
 
 if ! id cubynode >/dev/null 2>&1; then
-  useradd --system --create-home --home-dir "$INSTALL_DIR" --shell /usr/sbin/nologin cubynode
+  useradd --system --home-dir "$INSTALL_DIR" --shell /usr/sbin/nologin cubynode
 fi
 
-install -d -o cubynode -g cubynode -m 0755 "$INSTALL_DIR"
 install -d -o root -g cubynode -m 0750 "$ENV_DIR" "$STATE_DIR" "$LOG_DIR"
 
 if [[ -d "$INSTALL_DIR/.git" ]]; then
   runuser -u cubynode -- git -C "$INSTALL_DIR" fetch --prune origin "$CHANNEL"
   runuser -u cubynode -- git -C "$INSTALL_DIR" reset --hard "origin/$CHANNEL"
 else
-  rm -rf "$INSTALL_DIR"/*
+  rm -rf "$INSTALL_DIR"
+  install -d -o cubynode -g cubynode -m 0755 "$INSTALL_DIR"
   runuser -u cubynode -- git clone --branch "$CHANNEL" --single-branch "$REPO_URL" "$INSTALL_DIR"
 fi
 
-runuser -u cubynode -- npm --prefix "$INSTALL_DIR" install --omit=dev --no-audit --no-fund
+runuser -u cubynode -- npm --prefix "$INSTALL_DIR" install --omit=dev --no-audit --no-fund --package-lock=false
 runuser -u cubynode -- npm --prefix "$INSTALL_DIR" run check
 
 DB_PASS="$(openssl rand -hex 24)"
