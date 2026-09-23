@@ -247,3 +247,26 @@ pct start <CTID>
 ```
 
 The installer intentionally does not enable `keyctl=1` because Docker is not required inside the CubyNode control-plane LXC.
+
+## LXC first-boot troubleshooting
+
+An LXC failure such as `sync_wait: 34 (expected sequence number 7)` is a **generic symptom** and does not, on its own, establish that nesting is missing. The installer sets `nesting=1` before first boot. Root-filesystem permissions, storage mount options, AppArmor, mismatched template architecture and Proxmox host configuration can also cause similar failures.
+
+The installer now saves the **first boot debug log** at:
+
+```text
+/var/log/cubynode-lxc-start-<CTID>.log
+```
+
+It displays the most relevant startup errors in the TUI and preserves the failed LXC for inspection instead of deleting it.
+
+For an existing failed CT (substitute its actual CTID):
+
+```bash
+pct config 102
+pct start 102 --debug 2>&1 | tee /root/cubynode-102-debug.log
+pveversion -v
+journalctl -u pve-container@102.service --no-pager -n 100
+```
+
+Use the debug output to identify the actual failing phase **before** changing privileges, disabling AppArmor, removing the container or changing storage settings. In particular, `sync_wait` alone is not sufficient to diagnose a missing `nesting` feature.
