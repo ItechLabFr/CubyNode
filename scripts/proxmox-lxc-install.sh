@@ -216,8 +216,8 @@ pveam update >>"$LOG_FILE" 2>&1
 mapfile -t AVAILABLE_TEMPLATES < <(
   pveam available --section system 2>/dev/null |
     awk '$1=="system"{print $2}' |
-    grep -E '^(debian-(12|13)-standard|ubuntu-24\\.04-standard)_' |
-    grep -E "_${HOST_ARCH}\\.tar\\.(zst|gz|xz)$" |
+    grep -E '^(debian-(12|13)-standard|ubuntu-24\.04-standard)_' |
+    grep -E "_${HOST_ARCH}\.tar\.(zst|gz|xz)$" |
     sort -Vr
 )
 [[ "${#AVAILABLE_TEMPLATES[@]}" -gt 0 ]] || die "Aucun template Debian/Ubuntu compatible $HOST_ARCH trouvé dans pveam."
@@ -230,7 +230,7 @@ fi
 
 # Reject even explicitly overridden templates when their architecture differs.
 # This validation occurs BEFORE downloading or creating the container.
-[[ "$LXC_TEMPLATE" =~ _${HOST_ARCH}\\.tar\\.(zst|gz|xz)$ ]] ||
+[[ "$LXC_TEMPLATE" =~ _${HOST_ARCH}\.tar\.(zst|gz|xz)$ ]] ||
   die "Template incompatible : $LXC_TEMPLATE. Hôte : $HOST_ARCH. Choisir un template _${HOST_ARCH}.tar.zst."
 printf '%s\n' "${AVAILABLE_TEMPLATES[@]}" | grep -Fxq -- "$LXC_TEMPLATE" ||
   die "Template non disponible pour $HOST_ARCH : $LXC_TEMPLATE."
