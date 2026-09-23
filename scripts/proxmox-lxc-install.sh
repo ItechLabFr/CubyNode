@@ -374,7 +374,9 @@ progress 60 "Bootstrap privé vérifié"
 # Both logs may contain operational details and remain root-readable only.
 BOOTSTRAP_LOG="/var/log/cubynode-lxc-bootstrap-${CTID}.log"
 install -o root -g root -m 0600 /dev/null "$BOOTSTRAP_LOG"
-if ! pct exec "$CTID" -- env CUBYNODE_UPDATE_CHANNEL="$CHANNEL" bash /root/cubynode-bootstrap.sh >"$BOOTSTRAP_LOG" 2>&1; then
+if ! # pct exec may inherit CUBYNODE_GITHUB_TOKEN_FILE from the host launcher.
+# Force the in-container path; never pass an ephemeral host /tmp path.
+pct exec "$CTID" -- env CUBYNODE_GITHUB_TOKEN_FILE=/root/.cubynode-github-token CUBYNODE_UPDATE_CHANNEL="$CHANNEL" bash /root/cubynode-bootstrap.sh >"$BOOTSTRAP_LOG" 2>&1; then
   # Read only bootstrap errors: old LXC first-boot debug lines are irrelevant
   # once the container has started and transferred the bootstrap script.
   BOOTSTRAP_ERROR="$(grep -iE '(^E:|error|failed|fatal|denied|could not|not found|unable|refused|unsupported|timed out|invalid)' "$BOOTSTRAP_LOG" | tail -n 8 || true)"
