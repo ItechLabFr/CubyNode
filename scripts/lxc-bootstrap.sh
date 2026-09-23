@@ -44,7 +44,6 @@ case "${1:-}" in
   *) exit 1 ;;
 esac
 ASKPASS
-chown cubynode:cubynode "$GIT_SECRET_FILE" "$GIT_ASKPASS_FILE"
 
 cleanup_token(){
   unset GITHUB_TOKEN
@@ -66,6 +65,7 @@ fi
 systemctl enable --now postgresql
 
 if ! id cubynode >/dev/null 2>&1; then useradd --system --home-dir "$INSTALL_DIR" --shell /usr/sbin/nologin cubynode; fi
+chown cubynode:cubynode "$GIT_SECRET_FILE" "$GIT_ASKPASS_FILE"
 install -d -o root -g cubynode -m 0750 "$ENV_DIR" "$STATE_DIR" "$LOG_DIR"
 
 # Verify HTTPS Git access before altering the installation tree.
