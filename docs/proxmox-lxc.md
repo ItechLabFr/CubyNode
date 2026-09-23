@@ -335,7 +335,7 @@ pct exec "$CTID" -- sh -c 'test -s /root/.cubynode-github-token && test -r /root
 rm -f "$TOKEN_FILE" "$AUTH_FILE" "$BOOT_FILE"
 
 # Resume only after checking that the verification above succeeded:
-pct exec "$CTID" -- env CUBYNODE_UPDATE_CHANNEL=main bash /root/cubynode-bootstrap.sh
+pct exec "$CTID" -- env CUBYNODE_GITHUB_TOKEN_FILE=/root/.cubynode-github-token CUBYNODE_UPDATE_CHANNEL=main bash /root/cubynode-bootstrap.sh
 ```
 
 If the file-transfer verification fails, **do not run the final bootstrap command**. Check `pct status <CTID>` and `pct exec <CTID> -- ls -ld /root` instead.
@@ -368,3 +368,22 @@ token belongs to a user who has repository access and grants
 `Contents: Read` for `ItechLabFr/CubyNode`. For automatic deploy-key
 registration, it also needs `Administration: Read and write`.
 Never paste the PAT or a verbose Git HTTP trace into a support request.
+
+
+## Host-side token environment must not leak into the LXC
+
+The outer installer launch can set `CUBYNODE_GITHUB_TOKEN_FILE` to a temporary **Proxmox host** path (for example `/tmp/tmp.XXXXXX/token`). This host path is not valid inside the container. The bootstrap always reads its own token at `/root/.cubynode-github-token`, which `pct push` has created. The launcher also passes this path explicitly when invoking the bootstrap inside the CT, so an inherited host environment cannot override it.
+
+If a CT is already running and displays `Temporary GitHub token file does not exist in the LXC: /tmp/...`, check the container-local file without printing its contents:
+
+```bash
+pct exec <CTID> -- test -s /root/.cubynode-github-token
+```
+
+If the test succeeds, rerun the already transferred bootstrap using the container-local path:
+
+```bash
+pct exec <CTID> -- env CUBYNODE_GITHUB_TOKEN_FILE=/root/.cubynode-github-token CUBYNODE_UPDATE_CHANNEL=main bash /root/cubynode-bootstrap.sh
+```
+
+If the test fails, use the secure token-transfer recovery procedure above, rather than creating a new container. Keep PATs out of logs and support messages.
