@@ -26,13 +26,32 @@ if [[ ! -s "$TOKEN_FILE" || ! -r "$TOKEN_FILE" ]]; then
 fi
 GITHUB_TOKEN="$(cat "$TOKEN_FILE")"
 TOKEN_HEADER_FILE="$(mktemp /root/.cubynode-github-header.XXXXXX)"
-GIT_AUTH_CONFIG="$(mktemp /tmp/cubynode-git-auth.XXXXXX)"
-chmod 0600 "$TOKEN_HEADER_FILE" "$GIT_AUTH_CONFIG"
+GIT_ASKPASS_FILE="$(mktemp /tmp/cubynode-git-askpass.XXXXXX)"
+GIT_SECRET_FILE="$(mktemp /tmp/cubynode-git-secret.XXXXXX)"
+chmod 0600 "$TOKEN_HEADER_FILE" "$GIT_SECRET_FILE"
+chmod 0700 "$GIT_ASKPASS_FILE"
 printf 'Authorization: Bearer %s\n' "$GITHUB_TOKEN" >"$TOKEN_HEADER_FILE"
+
+# GitHub REST accepts Bearer for the download, but Git over HTTPS expects
+# a username and a PAT supplied as the password. Use a temporary askpass
+# helper: nothing secret is placed in argv, clone URLs or git config.
+printf '%s' "$GITHUB_TOKEN" >"$GIT_SECRET_FILE"
+cat >"$GIT_ASKPASS_FILE" <<'ASKPASS'
+#!/bin/sh
+case "${1:-}" in
+  *Username*|*username*) printf '%s\n' 'x-access-token' ;;
+  *Password*|*password*) exec cat "$CUBYNODE_GIT_TOKEN_FILE" ;;
+  *) exit 1 ;;
+esac
+ASKPASS
+chown cubynode:cubynode "$GIT_SECRET_FILE" "$GIT_ASKPASS_FILE"
 
 cleanup_token(){
   unset GITHUB_TOKEN
-  shred -u "$TOKEN_FILE" "$TOKEN_HEADER_FILE" "$GIT_AUTH_CONFIG" 2>/dev/null || rm -f "$TOKEN_FILE" "$TOKEN_HEADER_FILE" "$GIT_AUTH_CONFIG"
+  local secret
+  for secret in "$TOKEN_FILE" "$TOKEN_HEADER_FILE" "$GIT_SECRET_FILE" "$GIT_ASKPASS_FILE"; do
+    [[ ! -e "$secret" ]] || shred -u "$secret" 2>/dev/null || rm -f "$secret"
+  done
 }
 trap cleanup_token EXIT
 
@@ -49,16 +68,22 @@ systemctl enable --now postgresql
 if ! id cubynode >/dev/null 2>&1; then useradd --system --home-dir "$INSTALL_DIR" --shell /usr/sbin/nologin cubynode; fi
 install -d -o root -g cubynode -m 0750 "$ENV_DIR" "$STATE_DIR" "$LOG_DIR"
 
-# Clone the private repository using an ephemeral HTTP Authorization header.
+# Verify HTTPS Git access before altering the installation tree.
+git_private() {
+  runuser -u cubynode -- env \
+    GIT_TERMINAL_PROMPT=0 \
+    GIT_ASKPASS="$GIT_ASKPASS_FILE" \
+    CUBYNODE_GIT_TOKEN_FILE="$GIT_SECRET_FILE" \
+    git -c credential.helper= "$@"
+}
+if ! git_private ls-remote --exit-code "$REPO_HTTPS" "refs/heads/$CHANNEL" >/dev/null; then
+  echo "GitHub private clone authentication failed. Ensure the fine-grained PAT has Contents: Read on $OWNER/$REPO and that its owner has repository access." >&2
+  exit 1
+fi
+
 rm -rf "$INSTALL_DIR"
 install -d -o cubynode -g cubynode -m 0755 "$INSTALL_DIR"
-# Write sensitive Git config without putting the token on a process command line.
-cat >"$GIT_AUTH_CONFIG" <<GITAUTH
-[http]
-  extraHeader = Authorization: Bearer $GITHUB_TOKEN
-GITAUTH
-chown cubynode:cubynode "$GIT_AUTH_CONFIG"
-runuser -u cubynode -- git -c "include.path=$GIT_AUTH_CONFIG" clone --branch "$CHANNEL" --single-branch "$REPO_HTTPS" "$INSTALL_DIR"
+git_private clone --branch "$CHANNEL" --single-branch "$REPO_HTTPS" "$INSTALL_DIR"
 
 # Generate a dedicated read-only SSH deploy key for all future Git operations.
 ssh-keygen -q -t ed25519 -N '' -C "cubynode-$(hostname)" -f "$DEPLOY_KEY"
