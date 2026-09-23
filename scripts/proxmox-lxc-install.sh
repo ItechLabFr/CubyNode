@@ -14,7 +14,11 @@ DEFAULT_SWAP_MB=512
 LOG_FILE="/var/log/cubynode-lxc-installer.log"
 
 TUI=false
-[[ -t 0 && -t 1 ]] && command -v whiptail >/dev/null 2>&1 && TUI=true
+# The launcher may itself be started from a here-document. In that case
+# stdin is not a terminal even though the administrator has /dev/tty.
+if [[ -r /dev/tty && -w /dev/tty ]] && command -v whiptail >/dev/null 2>&1; then
+  TUI=true
+fi
 
 if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
   CYAN=$'\033[38;5;45m'; BLUE=$'\033[38;5;39m'; GREEN=$'\033[38;5;82m'
@@ -35,8 +39,7 @@ cleanup() {
 trap cleanup EXIT
 
 mkdir -p "$(dirname "$LOG_FILE")"
-touch "$LOG_FILE"
-chmod 0600 "$LOG_FILE"
+install -o root -g root -m 0600 /dev/null "$LOG_FILE"
 
 banner() {
   clear 2>/dev/null || true
@@ -59,7 +62,7 @@ EOF
 die() {
   local message="$1"
   if $TUI; then
-    whiptail --title "CubyNode • Erreur" --msgbox "$message\n\nLog : $LOG_FILE" 11 74
+    whiptail --title "CubyNode • Erreur" --msgbox "$message\n\nLog : $LOG_FILE" 11 74 </dev/tty >/dev/tty 2>&1
   else
     printf '\n%s✕ %s%s\nLog : %s\n' "$RED" "$message" "$RESET" "$LOG_FILE" >&2
   fi
@@ -81,7 +84,7 @@ trap on_error ERR
 step() {
   local n="$1" total="$2" title="$3" detail="${4:-}"
   if $TUI; then
-    whiptail --title "CubyNode • Étape $n/$total" --infobox "$title\n\n$detail" 10 72
+    whiptail --title "CubyNode • Étape $n/$total" --infobox "$title\n\n$detail" 10 72 </dev/tty >/dev/tty 2>&1
   else
     printf '\n%s[%s/%s]%s %s%s%s\n' "$BLUE" "$n" "$total" "$RESET" "$BOLD" "$title" "$RESET"
     [[ -n "$detail" ]] && printf '      %s%s%s\n' "$DIM" "$detail" "$RESET"
@@ -93,9 +96,9 @@ ok() { $TUI || printf '      %s✓%s %s\n' "$GREEN" "$RESET" "$1"; }
 password_box() {
   local text="$1" value
   if $TUI; then
-    value="$(whiptail --title "CubyNode • GitHub privé" --passwordbox "$text" 12 76 3>&1 1>&2 2>&3)" || exit 130
+    value="$(whiptail --title "CubyNode • GitHub privé" --passwordbox "$text" 12 76 3>&1 1>/dev/tty 2>&3 </dev/tty)" || exit 130
   else
-    read -r -s -p "GitHub token: " value
+    read -r -s -p "GitHub token: " value </dev/tty
     echo
   fi
   printf '%s' "$value"
@@ -118,13 +121,13 @@ storage_menu() {
       [[ -n "$info" ]] || info="stockage actif"
       args+=("$item" "$info")
     done
-    whiptail --title "CubyNode • $title" --menu       "Choisis le stockage pour $content." 19 78 10 "${args[@]}" 3>&1 1>&2 2>&3 || exit 130
+    whiptail --title "CubyNode • $title" --menu       "Choisis le stockage pour $content." 19 78 10 "${args[@]}" 3>&1 1>/dev/tty 2>&3 </dev/tty || exit 130
   else
     printf '\n%s%s%s\n' "$BOLD" "$title" "$RESET" >&2
     local i answer
     for i in "${!options[@]}"; do printf '  %s%d)%s %s\n' "$CYAN" "$((i+1))" "$RESET" "${options[$i]}" >&2; done
     while true; do
-      read -r -p "> " answer
+      read -r -p "> " answer </dev/tty
       if [[ "$answer" =~ ^[0-9]+$ ]] && ((answer>=1 && answer<=${#options[@]})); then
         printf '%s' "${options[$((answer-1))]}"
         return
@@ -137,9 +140,9 @@ disk_box() {
   local value
   if [[ -n "${CUBYNODE_DISK_GB:-}" ]]; then printf '%s' "$CUBYNODE_DISK_GB"; return; fi
   if $TUI; then
-    value="$(whiptail --title "CubyNode • Taille du disque" --inputbox       "Taille du disque système du LXC en Go.\n\nMinimum : 8 Go" 12 70 "$DEFAULT_DISK_GB" 3>&1 1>&2 2>&3)" || exit 130
+    value="$(whiptail --title "CubyNode • Taille du disque" --inputbox       "Taille du disque système du LXC en Go.\n\nMinimum : 8 Go" 12 70 "$DEFAULT_DISK_GB" 3>&1 1>/dev/tty 2>&3 </dev/tty)" || exit 130
   else
-    read -r -p "Taille du disque LXC en Go [$DEFAULT_DISK_GB]: " value
+    read -r -p "Taille du disque LXC en Go [$DEFAULT_DISK_GB]: " value </dev/tty
     value="${value:-$DEFAULT_DISK_GB}"
   fi
   printf '%s' "$value"
@@ -148,10 +151,10 @@ disk_box() {
 confirm_install() {
   local message="$1"
   if $TUI; then
-    whiptail --title "CubyNode • Résumé" --yes-button "Installer" --no-button "Annuler" --yesno "$message" 22 78
+    whiptail --title "CubyNode • Résumé" --yes-button "Installer" --no-button "Annuler" --yesno "$message" 22 78 </dev/tty >/dev/tty 2>&1
   else
     printf '\n%s%sRésumé%s\n%s\n' "$CYAN" "$BOLD" "$RESET" "$message"
-    read -r -p "Lancer l'installation ? [O/n] " answer
+    read -r -p "Lancer l'installation ? [O/n] " answer </dev/tty
     [[ ! "$answer" =~ ^[Nn] ]]
   fi
 }
@@ -161,7 +164,7 @@ progress() {
   filled=$((percent/5)); empty=$((20-filled))
   bar="$(printf '%*s' "$filled" '' | tr ' ' '█')$(printf '%*s' "$empty" '' | tr ' ' '░')"
   if $TUI; then
-    whiptail --title "CubyNode • Installation" --infobox "$title\n\n[$bar]  $percent%" 10 72
+    whiptail --title "CubyNode • Installation" --infobox "$title\n\n[$bar]  $percent%" 10 72 </dev/tty >/dev/tty 2>&1
   else
     printf '      %s✓%s %-34s %3s%%\n' "$GREEN" "$RESET" "$title" "$percent"
   fi
