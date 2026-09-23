@@ -53,7 +53,10 @@ install -d -o root -g cubynode -m 0750 "$ENV_DIR" "$STATE_DIR" "$LOG_DIR"
 rm -rf "$INSTALL_DIR"
 install -d -o cubynode -g cubynode -m 0755 "$INSTALL_DIR"
 # Write sensitive Git config without putting the token on a process command line.
-printf '[http]\\n\\textraHeader = Authorization: Bearer %s\\n' "$GITHUB_TOKEN" >"$GIT_AUTH_CONFIG"
+cat >"$GIT_AUTH_CONFIG" <<GITAUTH
+[http]
+  extraHeader = Authorization: Bearer $GITHUB_TOKEN
+GITAUTH
 chown cubynode:cubynode "$GIT_AUTH_CONFIG"
 runuser -u cubynode -- git -c "include.path=$GIT_AUTH_CONFIG" clone --branch "$CHANNEL" --single-branch "$REPO_HTTPS" "$INSTALL_DIR"
 
