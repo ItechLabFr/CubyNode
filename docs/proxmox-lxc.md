@@ -297,3 +297,47 @@ The installer writes the in-container bootstrap's output to a separate root-only
 ```
 
 That log may include credentials if bootstrap finished successfully. Redact access tokens, passwords, and URLs containing credentials before sharing any log. Do not destroy the CT when the bootstrap fails; it may be recoverable without downloading a new template.
+
+## Recover a running LXC whose private bootstrap token was not transferred
+
+If `pct status <CTID>` reports `running` but the bootstrap log ends with
+`Temporary GitHub token file is missing`, **keep the existing CT**.
+The Proxmox host needs to push a new temporary PAT into the CT, then rerun the bootstrap.
+
+On the Proxmox host, as root, replace `103` below with the failed CTID.
+This command securely prompts for the same scoped GitHub PAT; it is **not**
+placed in shell history or a Git remote URL.
+
+```bash
+CTID=103
+read -r -s -p "Temporary GitHub PAT: " PAT; echo
+TOKEN_FILE="$(mktemp /tmp/cubynode-recovery-token.XXXXXX)"
+AUTH_FILE="$(mktemp /tmp/cubynode-recovery-auth.XXXXXX)"
+BOOT_FILE="$(mktemp /tmp/cubynode-recovery-bootstrap.XXXXXX)"
+chmod 0600 "$TOKEN_FILE" "$AUTH_FILE" "$BOOT_FILE"
+printf '%s' "$PAT" > "$TOKEN_FILE"
+printf 'Authorization: Bearer %s\n' "$PAT" > "$AUTH_FILE"
+unset PAT
+
+curl -fsSL \
+  -H @"$AUTH_FILE" \
+  -H "Accept: application/vnd.github.raw+json" \
+  "https://api.github.com/repos/ItechLabFr/CubyNode/contents/scripts/lxc-bootstrap.sh?ref=main" \
+  -o "$BOOT_FILE"
+
+pct push "$CTID" "$BOOT_FILE" /root/cubynode-bootstrap.sh --user root --group root --perms 0755
+pct push "$CTID" "$TOKEN_FILE" /root/.cubynode-github-token --user root --group root --perms 0600
+
+# Verify the secret arrived; never display its contents.
+pct exec "$CTID" -- sh -c 'test -s /root/.cubynode-github-token && test -r /root/cubynode-bootstrap.sh' \
+  && echo "Token transfer verified"
+
+rm -f "$TOKEN_FILE" "$AUTH_FILE" "$BOOT_FILE"
+
+# Resume only after checking that the verification above succeeded:
+pct exec "$CTID" -- env CUBYNODE_UPDATE_CHANNEL=main bash /root/cubynode-bootstrap.sh
+```
+
+If the file-transfer verification fails, **do not run the final bootstrap command**. Check `pct status <CTID>` and `pct exec <CTID> -- ls -ld /root` instead.
+
+The installer now verifies both file readability and matching SHA-256 checksums **before** removing its host-side token. A failed verification stops the installation at that stage and preserves the CT.
