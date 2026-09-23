@@ -11,6 +11,7 @@ DEFAULT_DISK_GB=20
 DEFAULT_MEMORY_MB=2048
 DEFAULT_CORES=2
 DEFAULT_SWAP_MB=512
+DEFAULT_VLAN_TAG=10
 LOG_FILE="/var/log/cubynode-lxc-installer.log"
 
 TUI=false
@@ -256,6 +257,8 @@ step 5 6 "Préparation" "Calcul du CTID et détection du bridge réseau."
 CTID="$(pvesh get /cluster/nextid)"
 BRIDGE="$(ip -o link show type bridge 2>/dev/null | awk -F': ' '$2 ~ /^vmbr/{print $2; exit}')"
 BRIDGE="${BRIDGE:-vmbr0}"
+VLAN_TAG="${CUBYNODE_VLAN_TAG:-$DEFAULT_VLAN_TAG}"
+[[ "$VLAN_TAG" =~ ^[0-9]+$ ]] && ((VLAN_TAG>=1 && VLAN_TAG<=4094)) || die "VLAN invalide : $VLAN_TAG (attendu 1-4094)."
 HOSTNAME="cubynode-$CTID"
 
 SUMMARY="CubyNode $VERSION_LABEL
@@ -270,7 +273,7 @@ Disque          $ROOT_STORAGE • $DISK_GB Go
 CPU             $DEFAULT_CORES cores
 RAM             $DEFAULT_MEMORY_MB Mo
 Swap            $DEFAULT_SWAP_MB Mo
-Réseau          $BRIDGE • DHCP
+Réseau          $BRIDGE • VLAN $VLAN_TAG • DHCP
 Sécurité        LXC non privilégié
 Nesting         activé (systemd 257)
 Auto-start      activé"
@@ -281,7 +284,7 @@ step 6 6 "Installation" "Création et configuration du conteneur CubyNode."
 
 # Important: do not start during pct create. nesting=1 must exist before the
 # first boot for current Debian/systemd containers.
-pct create "$CTID" "$TEMPLATE_REF"   --hostname "$HOSTNAME"   --description "CubyNode control plane • $VERSION_LABEL"   --rootfs "$ROOT_STORAGE:$DISK_GB"   --cores "$DEFAULT_CORES"   --memory "$DEFAULT_MEMORY_MB"   --swap "$DEFAULT_SWAP_MB"   --net0 "name=eth0,bridge=$BRIDGE,ip=dhcp,type=veth"   --unprivileged 1   --features nesting=1   --onboot 1 >>"$LOG_FILE" 2>&1
+pct create "$CTID" "$TEMPLATE_REF"   --hostname "$HOSTNAME"   --description "CubyNode control plane • $VERSION_LABEL"   --rootfs "$ROOT_STORAGE:$DISK_GB"   --cores "$DEFAULT_CORES"   --memory "$DEFAULT_MEMORY_MB"   --swap "$DEFAULT_SWAP_MB"   --net0 "name=eth0,bridge=$BRIDGE,tag=$VLAN_TAG,ip=dhcp,type=veth"   --unprivileged 1   --features nesting=1   --onboot 1 >>"$LOG_FILE" 2>&1
 
 progress 20 "LXC $CTID créé avec nesting=1"
 

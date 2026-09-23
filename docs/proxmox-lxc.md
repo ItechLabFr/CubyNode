@@ -413,3 +413,20 @@ pct exec 102 -- getent ahostsv4 deb.debian.org
 Use the site's router/internal DNS instead when public DNS is restricted. If there is no IP or default route, fix DHCP/bridge/gateway first; a nameserver change will not restore missing connectivity.
 
 The launcher now checks DNS for Debian, security updates, NodeSource and GitHub **before** transferring a PAT into the CT. The bootstrap also retries DNS and apt package fetches. These checks detect and tolerate transient failures but cannot override local firewalls or broken network infrastructure. If a bootstrap already failed, the token may have been cleaned up; use the safe same-CT recovery procedure above after restoring DNS.
+
+
+## VLAN 10 par défaut
+
+Le LXC CubyNode est créé sur `vmbr0` avec un tag VLAN `10` et une adresse IPv4 obtenue en DHCP :
+
+```text
+net0: name=eth0,bridge=vmbr0,tag=10,ip=dhcp,type=veth
+```
+
+Le VLAN peut être changé sans modifier le script en lançant l'installateur avec :
+
+```bash
+CUBYNODE_VLAN_TAG=20 ...
+```
+
+La valeur doit être comprise entre 1 et 4094. Le bridge Proxmox et le switch physique doivent transporter le VLAN choisi, et le VLAN doit disposer d'un serveur DHCP/DNS fonctionnel.
