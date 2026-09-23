@@ -173,7 +173,7 @@ github_raw() {
 }
 
 [[ "${EUID}" -eq 0 ]] || die "Lance ce script en root sur le host Proxmox VE."
-for cmd in pct pvesm pveam pvesh curl ip awk; do
+for cmd in pct pvesm pveam pvesh curl ip awk dpkg; do
   command -v "$cmd" >/dev/null 2>&1 || die "Commande Proxmox manquante : $cmd"
 done
 
@@ -202,20 +202,44 @@ TEMPLATE_STORAGE="${CUBYNODE_TEMPLATE_STORAGE:-}"
 [[ -n "$TEMPLATE_STORAGE" ]] || TEMPLATE_STORAGE="$(storage_menu "Template LXC" "les templates LXC" "${TEMPLATE_STORAGES[@]}")"
 ok "Template storage : $TEMPLATE_STORAGE"
 
-step 3 6 "Template système" "Sélection automatique du dernier Debian 13 standard."
+step 3 6 "Template système" "Sélection automatique du dernier Debian 13 pour l'architecture de l'hôte."
+
+# Native LXC executes /sbin/init using the host kernel: never select an
+# ARM64 rootfs on an amd64 Proxmox host (or vice versa). That would fail
+# before systemd starts with "Exec format error".
+HOST_ARCH="$(dpkg --print-architecture)"
+case "$HOST_ARCH" in
+  amd64|arm64) ;;
+  *) die "Architecture Proxmox non prise en charge automatiquement : $HOST_ARCH." ;;
+esac
 pveam update >>"$LOG_FILE" 2>&1
-mapfile -t AVAILABLE_TEMPLATES < <(pveam available --section system 2>/dev/null | awk '$1=="system"{print $2}' | grep -E '^(debian-(12|13)-standard|ubuntu-24\.04-standard)_' | sort -Vr)
-[[ "${#AVAILABLE_TEMPLATES[@]}" -gt 0 ]] || die "Aucun template Debian/Ubuntu compatible trouvé."
+mapfile -t AVAILABLE_TEMPLATES < <(
+  pveam available --section system 2>/dev/null |
+    awk '$1=="system"{print $2}' |
+    grep -E '^(debian-(12|13)-standard|ubuntu-24\.04-standard)_' |
+    grep -E "_${HOST_ARCH}\.tar\.(zst|gz|xz)$" |
+    sort -Vr
+)
+[[ "${#AVAILABLE_TEMPLATES[@]}" -gt 0 ]] || die "Aucun template Debian/Ubuntu compatible $HOST_ARCH trouvé dans pveam."
+
 LXC_TEMPLATE="${CUBYNODE_LXC_TEMPLATE:-}"
 if [[ -z "$LXC_TEMPLATE" ]]; then
   LXC_TEMPLATE="$(printf '%s\n' "${AVAILABLE_TEMPLATES[@]}" | grep '^debian-13-standard_' | head -n1 || true)"
   [[ -n "$LXC_TEMPLATE" ]] || LXC_TEMPLATE="${AVAILABLE_TEMPLATES[0]}"
 fi
+
+# Reject even explicitly overridden templates when their architecture differs.
+# This validation occurs BEFORE downloading or creating the container.
+[[ "$LXC_TEMPLATE" =~ _${HOST_ARCH}\.tar\.(zst|gz|xz)$ ]] ||
+  die "Template incompatible : $LXC_TEMPLATE. Hôte : $HOST_ARCH. Choisir un template _${HOST_ARCH}.tar.zst."
+printf '%s\n' "${AVAILABLE_TEMPLATES[@]}" | grep -Fxq -- "$LXC_TEMPLATE" ||
+  die "Template non disponible pour $HOST_ARCH : $LXC_TEMPLATE."
+
 if ! pveam list "$TEMPLATE_STORAGE" 2>/dev/null | awk 'NR>1{print $1}' | grep -Fq "vztmpl/$LXC_TEMPLATE"; then
   pveam download "$TEMPLATE_STORAGE" "$LXC_TEMPLATE" >>"$LOG_FILE" 2>&1
 fi
 TEMPLATE_REF="$TEMPLATE_STORAGE:vztmpl/$LXC_TEMPLATE"
-ok "$LXC_TEMPLATE"
+ok "$LXC_TEMPLATE • $HOST_ARCH"
 
 step 4 6 "Stockage du LXC" "Choix du stockage du disque système."
 mapfile -t ROOT_STORAGES < <(pvesm status -content rootdir 2>/dev/null | awk 'NR>1 && $3=="active"{print $1}')
@@ -236,6 +260,7 @@ SUMMARY="CubyNode $VERSION_LABEL
 CTID            $CTID
 Hostname        $HOSTNAME
 Template        $LXC_TEMPLATE
+Architecture    $HOST_ARCH
 Template store  $TEMPLATE_STORAGE
 Disque          $ROOT_STORAGE • $DISK_GB Go
 

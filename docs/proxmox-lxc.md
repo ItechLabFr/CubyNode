@@ -270,3 +270,10 @@ journalctl -u pve-container@102.service --no-pager -n 100
 ```
 
 Use the debug output to identify the actual failing phase **before** changing privileges, disabling AppArmor, removing the container or changing storage settings. In particular, `sync_wait` alone is not sufficient to diagnose a missing `nesting` feature.
+
+
+## Native LXC template architecture
+
+Native LXC instances must use the same CPU architecture as the Proxmox host. The installer now reads `dpkg --print-architecture` and chooses only matching Debian/Ubuntu templates (e.g. `_amd64.tar.zst` on an amd64 host). Explicit template overrides with the wrong architecture are rejected **before** creating the container.
+
+An architecture mismatch typically causes `Exec format error - Failed to exec "/sbin/init"` at first boot; `nesting=1` does not solve this error. The root filesystem of an already-created container with the wrong CPU architecture must be replaced/recreated using the correct template after preserving any important data; simply changing `arch:` in the container config does not convert its binaries.
