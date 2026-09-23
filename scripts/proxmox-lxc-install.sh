@@ -257,7 +257,45 @@ pct create "$CTID" "$TEMPLATE_REF"   --hostname "$HOSTNAME"   --description "Cub
 
 progress 20 "LXC $CTID créé avec nesting=1"
 
-pct start "$CTID" >>"$LOG_FILE" 2>&1
+# Always keep the first-boot debug trace: sync_wait/Failed to spawn alone
+# does not identify the cause of an LXC startup failure.
+START_LOG="/var/log/cubynode-lxc-start-${CTID}.log"
+if ! pct start "$CTID" --debug >"$START_LOG" 2>&1; then
+  chmod 0600 "$START_LOG"
+  cat "$START_LOG" >>"$LOG_FILE"
+  {
+    printf '\n===== Proxmox version =====\n'
+    pveversion -v || true
+    printf '\n===== Container configuration =====\n'
+    pct config "$CTID" || true
+    printf '\n===== Proxmox container journal =====\n'
+    journalctl -u "pve-container@${CTID}.service" -n 100 --no-pager || true
+  } >>"$START_LOG" 2>&1
+
+  # Surface relevant errors instead of the last eight incidental log lines
+  # (which often contain only cleanup and the generic sync_wait message).
+  START_CAUSE="$(grep -iE 'permission denied|failed to exec|no such file|exec format|apparmor|failed to (mount|setup|run)|prestart.*(failed|error)|symlink encountered|not permitted|cgroup' "$START_LOG" \
+    | grep -ivE 'sync_wait:|failed to spawn container' | head -n 7 || true)"
+  [[ -n "$START_CAUSE" ]] || START_CAUSE="Cause non identifiée dans le résumé. Consulter le log debug complet."
+
+  ERROR_MESSAGE="Impossible de démarrer le LXC $CTID.
+
+$START_CAUSE
+
+Diagnostic enregistré dans :
+$START_LOG
+
+Le LXC n'a pas été supprimé.
+Pour investiguer : pct start $CTID --debug"
+  if $TUI; then
+    whiptail --title "CubyNode • Diagnostic LXC $CTID" --scrolltext --msgbox "$ERROR_MESSAGE" 22 84
+  else
+    printf '\n%s✕ %s%s\n' "$RED" "$ERROR_MESSAGE" "$RESET" >&2
+  fi
+  exit 1
+fi
+chmod 0600 "$START_LOG"
+cat "$START_LOG" >>"$LOG_FILE"
 progress 35 "Premier démarrage réussi"
 
 for _ in {1..60}; do
