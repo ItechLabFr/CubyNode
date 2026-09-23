@@ -387,3 +387,29 @@ pct exec <CTID> -- env CUBYNODE_GITHUB_TOKEN_FILE=/root/.cubynode-github-token C
 ```
 
 If the test fails, use the secure token-transfer recovery procedure above, rather than creating a new container. Keep PATs out of logs and support messages.
+
+
+## Debian mirror DNS failure during bootstrap
+
+When the LXC has started but apt reports `Temporary failure resolving 'deb.debian.org'`, it is a DNS/network problem **inside the CT**, not a LXC creation or GitHub-authentication error. Keep the existing container and inspect from the Proxmox host (replace the CTID):
+
+```bash
+pct status 102
+pct exec 102 -- ip -4 addr show dev eth0
+pct exec 102 -- ip -4 route
+pct exec 102 -- cat /etc/resolv.conf
+pct exec 102 -- getent ahostsv4 deb.debian.org
+pct exec 102 -- getent ahostsv4 security.debian.org
+```
+
+If the CT has a valid IP and default gateway but DNS lookup fails, configure a reachable DNS server in Proxmox for **that CT**, for example:
+
+```bash
+pct set 102 --nameserver 1.1.1.1
+pct reboot 102
+pct exec 102 -- getent ahostsv4 deb.debian.org
+```
+
+Use the site's router/internal DNS instead when public DNS is restricted. If there is no IP or default route, fix DHCP/bridge/gateway first; a nameserver change will not restore missing connectivity.
+
+The launcher now checks DNS for Debian, security updates, NodeSource and GitHub **before** transferring a PAT into the CT. The bootstrap also retries DNS and apt package fetches. These checks detect and tolerate transient failures but cannot override local firewalls or broken network infrastructure. If a bootstrap already failed, the token may have been cleaned up; use the safe same-CT recovery procedure above after restoring DNS.
