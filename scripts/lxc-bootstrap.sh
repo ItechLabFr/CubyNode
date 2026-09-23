@@ -16,7 +16,14 @@ DEPLOY_KEY="$STATE_DIR/github_deploy_key"
 KNOWN_HOSTS="$ENV_DIR/github_known_hosts"
 
 [[ "${EUID}" -eq 0 ]] || { echo "This bootstrap must run as root inside the LXC." >&2; exit 1; }
-[[ -s "$TOKEN_FILE" ]] || { echo "Temporary GitHub token file is missing." >&2; exit 1; }
+if [[ ! -e "$TOKEN_FILE" ]]; then
+  echo "Temporary GitHub token file does not exist in the LXC: $TOKEN_FILE" >&2
+  exit 1
+fi
+if [[ ! -s "$TOKEN_FILE" || ! -r "$TOKEN_FILE" ]]; then
+  echo "Temporary GitHub token file is empty or unreadable in the LXC: $TOKEN_FILE" >&2
+  exit 1
+fi
 GITHUB_TOKEN="$(cat "$TOKEN_FILE")"
 TOKEN_HEADER_FILE="$(mktemp /root/.cubynode-github-header.XXXXXX)"
 GIT_AUTH_CONFIG="$(mktemp /tmp/cubynode-git-auth.XXXXXX)"
@@ -45,7 +52,8 @@ install -d -o root -g cubynode -m 0750 "$ENV_DIR" "$STATE_DIR" "$LOG_DIR"
 # Clone the private repository using an ephemeral HTTP Authorization header.
 rm -rf "$INSTALL_DIR"
 install -d -o cubynode -g cubynode -m 0755 "$INSTALL_DIR"
-git config -f "$GIT_AUTH_CONFIG" http.extraHeader "Authorization: Bearer $GITHUB_TOKEN"
+# Write sensitive Git config without putting the token on a process command line.
+printf '[http]\\n\\textraHeader = Authorization: Bearer %s\\n' "$GITHUB_TOKEN" >"$GIT_AUTH_CONFIG"
 chown cubynode:cubynode "$GIT_AUTH_CONFIG"
 runuser -u cubynode -- git -c "include.path=$GIT_AUTH_CONFIG" clone --branch "$CHANNEL" --single-branch "$REPO_HTTPS" "$INSTALL_DIR"
 
@@ -57,7 +65,7 @@ chown root:cubynode "$KNOWN_HOSTS"; chmod 0640 "$KNOWN_HOSTS"
 
 PUBKEY="$(cat "$DEPLOY_KEY.pub")"
 TITLE="CubyNode $(hostname) $(date -u +%Y%m%dT%H%M%SZ)"
-HTTP_CODE="$(curl -sS -o /tmp/cubynode-deploy-key-response.json -w '%{http_code}'   -X POST   -H "Authorization: Bearer $GITHUB_TOKEN"   -H "Accept: application/vnd.github+json"   -H "X-GitHub-Api-Version: 2026-03-10"   "https://api.github.com/repos/$OWNER/$REPO/keys"   -d "$(python3 -c 'import json,sys; print(json.dumps({"title":sys.argv[1],"key":sys.argv[2],"read_only":True}))' "$TITLE" "$PUBKEY")")"
+HTTP_CODE="$(curl -sS -o /tmp/cubynode-deploy-key-response.json -w '%{http_code}'   -X POST   -H @"$TOKEN_HEADER_FILE"   -H "Accept: application/vnd.github+json"   -H "X-GitHub-Api-Version: 2026-03-10"   "https://api.github.com/repos/$OWNER/$REPO/keys"   -d "$(python3 -c 'import json,sys; print(json.dumps({"title":sys.argv[1],"key":sys.argv[2],"read_only":True}))' "$TITLE" "$PUBKEY")")"
 if [[ "$HTTP_CODE" != "201" ]]; then
   echo "GitHub refused deploy-key creation (HTTP $HTTP_CODE)." >&2
   cat /tmp/cubynode-deploy-key-response.json >&2 || true
