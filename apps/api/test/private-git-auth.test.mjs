@@ -41,12 +41,12 @@ test('in-container token path is isolated from the host-side launcher environmen
   const assignment=bootstrap.match(/^TOKEN_FILE="[^"]*"$/m);
   assert.ok(assignment, 'bootstrap must set its own token path');
 
-  const result=spawnSync('bash',['-c',assignment[0] + '\\n' + 'printf %s "$TOKEN_FILE"'],{
+  const result=spawnSync('bash',['-c',assignment[0] + '\n' + 'printf %s "$TOKEN_FILE"'],{
     env:{...process.env, CUBYNODE_GITHUB_TOKEN_FILE:'/tmp/host-not-inside-container/token'},
     encoding:'utf8',
   });
   assert.equal(result.status,0);
   assert.equal(result.stdout,'/root/.cubynode-github-token');
 
-  assert.match(installer, /pct exec "\\$CTID" -- env CUBYNODE_GITHUB_TOKEN_FILE=\\/root\\/\\.cubynode-github-token/);
+  assert.ok(installer.includes('pct exec "$CTID" -- env CUBYNODE_GITHUB_TOKEN_FILE=/root/.cubynode-github-token'));
 });
