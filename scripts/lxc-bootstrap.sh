@@ -6,7 +6,10 @@ REPO="CubyNode"
 REPO_HTTPS="https://github.com/$OWNER/$REPO.git"
 REPO_SSH="git@github.com:$OWNER/$REPO.git"
 CHANNEL="${CUBYNODE_UPDATE_CHANNEL:-main}"
-TOKEN_FILE="${CUBYNODE_GITHUB_TOKEN_FILE:-/root/.cubynode-github-token}"
+# The host launcher uses CUBYNODE_GITHUB_TOKEN_FILE for its host-side PAT.
+# pct exec can propagate that host path into the container; the container
+# must ALWAYS read the file pct push placed at this fixed in-container path.
+TOKEN_FILE="/root/.cubynode-github-token"
 INSTALL_DIR="/opt/cubynode"
 ENV_DIR="/etc/cubynode"
 ENV_FILE="$ENV_DIR/cubynode.env"
