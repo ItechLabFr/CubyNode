@@ -277,3 +277,23 @@ Use the debug output to identify the actual failing phase **before** changing pr
 Native LXC instances must use the same CPU architecture as the Proxmox host. The installer now reads `dpkg --print-architecture` and chooses only matching Debian/Ubuntu templates (e.g. `_amd64.tar.zst` on an amd64 host). Explicit template overrides with the wrong architecture are rejected **before** creating the container.
 
 An architecture mismatch typically causes `Exec format error - Failed to exec "/sbin/init"` at first boot; `nesting=1` does not solve this error. The root filesystem of an already-created container with the wrong CPU architecture must be replaced/recreated using the correct template after preserving any important data; simply changing `arch:` in the container config does not convert its binaries.
+
+
+## Bootstrap fails after LXC boots
+
+A successful `pct start` ends with `Started "/sbin/init"`. If the installer instead fails while executing the in-container bootstrap (currently the step after "Bootstrap privé transféré"), don't diagnose it as an LXC startup error.
+
+For an existing failed CT, inspect its state and the root-only installer log on the Proxmox host:
+
+```bash
+pct status <CTID>
+tail -n 100 /var/log/cubynode-lxc-installer.log
+```
+
+The installer writes the in-container bootstrap's output to a separate root-only file during new installs:
+
+```text
+/var/log/cubynode-lxc-bootstrap-<CTID>.log
+```
+
+That log may include credentials if bootstrap finished successfully. Redact access tokens, passwords, and URLs containing credentials before sharing any log. Do not destroy the CT when the bootstrap fails; it may be recoverable without downloading a new template.
