@@ -338,8 +338,12 @@ chmod 0600 "$TMP_TOKEN"
 
 # Proxmox must write both files as the container's root user.
 # Verify that the token really exists and matches before deleting the host copy.
-pct push "$CTID" "$TMP_BOOTSTRAP" /root/cubynode-bootstrap.sh --user root --group root --perms 0755 >>"$LOG_FILE" 2>&1
-pct push "$CTID" "$TMP_TOKEN" /root/.cubynode-github-token --user root --group root --perms 0600 >>"$LOG_FILE" 2>&1
+if ! pct push "$CTID" "$TMP_BOOTSTRAP" /root/cubynode-bootstrap.sh --user root --group root --perms 0755 >>"$LOG_FILE" 2>&1; then
+  die "Transfert du script de bootstrap vers le LXC $CTID impossible. Voir : $LOG_FILE"
+fi
+if ! pct push "$CTID" "$TMP_TOKEN" /root/.cubynode-github-token --user root --group root --perms 0600 >>"$LOG_FILE" 2>&1; then
+  die "Transfert du token GitHub vers le LXC $CTID impossible. Voir : $LOG_FILE"
+fi
 
 if ! pct exec "$CTID" -- /bin/sh -c 'test -s /root/.cubynode-github-token && test -r /root/cubynode-bootstrap.sh' >>"$LOG_FILE" 2>&1; then
   die "Le transfert du token GitHub vers le LXC $CTID a échoué. L'installation s'arrête AVANT le bootstrap. Le conteneur reste disponible pour diagnostic."
