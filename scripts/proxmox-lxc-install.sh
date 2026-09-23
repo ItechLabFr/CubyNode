@@ -347,7 +347,35 @@ TMP_TOKEN=""
 
 progress 60 "Bootstrap privé transféré"
 
-pct exec "$CTID" -- env CUBYNODE_UPDATE_CHANNEL="$CHANNEL" bash /root/cubynode-bootstrap.sh >>"$LOG_FILE" 2>&1
+# Keep bootstrap output separate from the earlier (successful) LXC boot trace.
+# Both logs may contain operational details and remain root-readable only.
+BOOTSTRAP_LOG="/var/log/cubynode-lxc-bootstrap-${CTID}.log"
+install -o root -g root -m 0600 /dev/null "$BOOTSTRAP_LOG"
+if ! pct exec "$CTID" -- env CUBYNODE_UPDATE_CHANNEL="$CHANNEL" bash /root/cubynode-bootstrap.sh >"$BOOTSTRAP_LOG" 2>&1; then
+  # Read only bootstrap errors: old LXC first-boot debug lines are irrelevant
+  # once the container has started and transferred the bootstrap script.
+  BOOTSTRAP_ERROR="$(grep -iE '(^E:|error|failed|fatal|denied|could not|not found|unable|refused|unsupported|timed out|invalid)' "$BOOTSTRAP_LOG" | tail -n 8 || true)"
+  [[ -n "$BOOTSTRAP_ERROR" ]] || BOOTSTRAP_ERROR="$(tail -n 12 "$BOOTSTRAP_LOG" || true)"
+  [[ -n "$BOOTSTRAP_ERROR" ]] || BOOTSTRAP_ERROR="Le bootstrap a quitté avec une erreur sans message exploitable."
+
+  ERROR_MESSAGE="Le conteneur LXC $CTID a bien démarré, mais l'installation de CubyNode a échoué.
+
+$BOOTSTRAP_ERROR
+
+Journal dédié : $BOOTSTRAP_LOG
+
+Le conteneur est conservé pour diagnostic.
+Vérifier : pct status $CTID"
+
+  if $TUI; then
+    whiptail --title "CubyNode • Échec du bootstrap" --scrolltext --msgbox "$ERROR_MESSAGE" 22 84
+  else
+    printf '\n%s✕ %s%s\n' "$RED" "$ERROR_MESSAGE" "$RESET" >&2
+  fi
+  exit 1
+fi
+# Credentials may appear at the end of successful bootstrap logs; never copy
+# the complete bootstrap log to the installer log or a non-root-readable path.
 progress 90 "CubyNode et PostgreSQL installés"
 
 IP="$(pct exec "$CTID" -- bash -lc "hostname -I | awk '{print \\$1}'" 2>/dev/null | tr -d '\r')"
