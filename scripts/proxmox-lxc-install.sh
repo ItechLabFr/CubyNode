@@ -326,12 +326,28 @@ chmod 0600 "$START_LOG"
 cat "$START_LOG" >>"$LOG_FILE"
 progress 35 "Premier démarrage réussi"
 
-for _ in {1..60}; do
-  pct exec "$CTID" -- bash -lc 'getent hosts github.com >/dev/null 2>&1' >>"$LOG_FILE" 2>&1 && break
+# GitHub connectivity alone is not sufficient: apt needs Debian mirrors, too.
+# Check every download host before any changes inside the CT. DNS might still
+# become unavailable later, so lxc-bootstrap.sh also checks and retries apt.
+DNS_PREFLIGHT='for host in deb.debian.org security.debian.org deb.nodesource.com github.com api.github.com; do getent ahostsv4 "$host" >/dev/null 2>&1 || { echo "DNS unavailable: $host" >&2; exit 1; }; done'
+DNS_READY=false
+for _ in {1..30}; do
+  if pct exec "$CTID" -- sh -c "$DNS_PREFLIGHT" >>"$LOG_FILE" 2>&1; then
+    DNS_READY=true
+    break
+  fi
   sleep 2
 done
-pct exec "$CTID" -- bash -lc 'getent hosts github.com >/dev/null 2>&1' >>"$LOG_FILE" 2>&1   || die "Le LXC a démarré mais n'a pas d'accès réseau/DNS."
-progress 50 "Réseau et DNS disponibles"
+if ! $DNS_READY; then
+  {
+    printf '\n===== LXC network diagnostics =====\n'
+    pct exec "$CTID" -- ip -4 addr show dev eth0 || true
+    pct exec "$CTID" -- ip -4 route || true
+    pct exec "$CTID" -- cat /etc/resolv.conf || true
+  } >>"$LOG_FILE" 2>&1
+  die "Le LXC $CTID ne résout pas tous les domaines requis (Debian/NodeSource/GitHub). Vérifie DNS et passerelle. Aucun bootstrap lancé. Journal : $LOG_FILE"
+fi
+progress 50 "DNS Debian, NodeSource et GitHub validés"
 
 TMP_BOOTSTRAP="/tmp/cubynode-lxc-bootstrap-$CTID.sh"
 TMP_TOKEN="/tmp/cubynode-github-token-$CTID"
