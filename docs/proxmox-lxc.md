@@ -341,3 +341,30 @@ pct exec "$CTID" -- env CUBYNODE_UPDATE_CHANNEL=main bash /root/cubynode-bootstr
 If the file-transfer verification fails, **do not run the final bootstrap command**. Check `pct status <CTID>` and `pct exec <CTID> -- ls -ld /root` instead.
 
 The installer now verifies both file readability and matching SHA-256 checksums **before** removing its host-side token. A failed verification stops the installation at that stage and preserves the CT.
+
+
+## Private Git clone asks for a username (bootstrap retry)
+
+If the recovery bootstrap finishes installing Node.js and PostgreSQL, but
+`git clone` requests a GitHub username and eventually reports
+`Authentication failed`, the LXC and dependency installation have succeeded.
+The old bootstrap used an HTTP Bearer header for Git HTTPS cloning, whereas
+GitHub documents PATs for Git HTTPS as passwords, accompanied by a nonempty
+username.
+
+The private bootstrap now uses a temporary `GIT_ASKPASS` helper that supplies
+`x-access-token` as the username and reads the PAT from a temporary
+`0600` file as the password. Git's terminal prompt is disabled. The token
+is never placed in the remote URL or in Git's persistent configuration.
+
+**Recovery:** Keep the running CT and rerun the existing
+[private-repository recovery commands](#recover-a-running-lxc-whose-private-bootstrap-token-was-not-transferred)
+using the current bootstrap from `main` and the same temporary PAT.
+The bootstrap may reuse already installed OS dependencies, then establishes a
+dedicated read-only SSH Deploy Key for subsequent admin-panel updates.
+
+If `git ls-remote` authentication still fails, confirm the fine-grained
+token belongs to a user who has repository access and grants
+`Contents: Read` for `ItechLabFr/CubyNode`. For automatic deploy-key
+registration, it also needs `Administration: Read and write`.
+Never paste the PAT or a verbose Git HTTP trace into a support request.
