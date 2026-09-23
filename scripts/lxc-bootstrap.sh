@@ -58,12 +58,30 @@ cleanup_token(){
 trap cleanup_token EXIT
 
 export DEBIAN_FRONTEND=noninteractive
-apt-get update
-apt-get install -y ca-certificates curl git openssh-client sudo postgresql postgresql-contrib openssl python3 util-linux xz-utils
+# apt may encounter temporary DNS errors after the launcher preflight has
+# succeeded. Retry DNS before apt, and retry transient apt fetch failures.
+DNS_READY=false
+for _ in {1..12}; do
+  if getent ahostsv4 deb.debian.org >/dev/null 2>&1 &&
+     getent ahostsv4 security.debian.org >/dev/null 2>&1 &&
+     getent ahostsv4 deb.nodesource.com >/dev/null 2>&1 &&
+     getent ahostsv4 github.com >/dev/null 2>&1; then
+    DNS_READY=true
+    break
+  fi
+  echo "Waiting for Debian/NodeSource/GitHub DNS resolution..." >&2
+  sleep 5
+done
+if ! $DNS_READY; then
+  echo "DNS resolution inside this LXC is unavailable. Check /etc/resolv.conf, the DHCP gateway and Proxmox nameserver settings; do not recreate the container." >&2
+  exit 1
+fi
+apt-get -o Acquire::Retries=5 update
+apt-get -o Acquire::Retries=5 install -y ca-certificates curl git openssh-client sudo postgresql postgresql-contrib openssl python3 util-linux xz-utils
 
 if ! command -v node >/dev/null 2>&1 || [[ "$(node -p 'Number(process.versions.node.split(".")[0])' 2>/dev/null || echo 0)" -lt 24 ]]; then
   curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
-  apt-get install -y nodejs
+  apt-get -o Acquire::Retries=5 install -y nodejs
 fi
 systemctl enable --now postgresql
 
