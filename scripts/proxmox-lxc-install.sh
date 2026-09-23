@@ -336,16 +336,32 @@ github_raw "scripts/lxc-bootstrap.sh" "$TMP_BOOTSTRAP"
 printf '%s' "$GITHUB_TOKEN" >"$TMP_TOKEN"
 chmod 0600 "$TMP_TOKEN"
 
-pct push "$CTID" "$TMP_BOOTSTRAP" /root/cubynode-bootstrap.sh --perms 0755 >>"$LOG_FILE" 2>&1
-pct push "$CTID" "$TMP_TOKEN" /root/.cubynode-github-token --perms 0600 >>"$LOG_FILE" 2>&1
+# Proxmox must write both files as the container's root user.
+# Verify that the token really exists and matches before deleting the host copy.
+pct push "$CTID" "$TMP_BOOTSTRAP" /root/cubynode-bootstrap.sh --user root --group root --perms 0755 >>"$LOG_FILE" 2>&1
+pct push "$CTID" "$TMP_TOKEN" /root/.cubynode-github-token --user root --group root --perms 0600 >>"$LOG_FILE" 2>&1
 
-# Secret no longer needed on the Proxmox host.
+if ! pct exec "$CTID" -- /bin/sh -c 'test -s /root/.cubynode-github-token && test -r /root/cubynode-bootstrap.sh' >>"$LOG_FILE" 2>&1; then
+  die "Le transfert du token GitHub vers le LXC $CTID a échoué. L'installation s'arrête AVANT le bootstrap. Le conteneur reste disponible pour diagnostic."
+fi
+
+# A positive size/readability check alone could still accept an incomplete
+# transfer. Compare content without printing or logging the token itself.
+HOST_TOKEN_HASH="$(sha256sum "$TMP_TOKEN" | awk '{print $1}')"
+CT_TOKEN_HASH="$(pct exec "$CTID" -- sha256sum /root/.cubynode-github-token | awk '{print $1}')"
+if [[ -z "$CT_TOKEN_HASH" || "$HOST_TOKEN_HASH" != "$CT_TOKEN_HASH" ]]; then
+  unset HOST_TOKEN_HASH CT_TOKEN_HASH
+  die "Le token GitHub n'a pas été copié intégralement dans le LXC $CTID."
+fi
+unset HOST_TOKEN_HASH CT_TOKEN_HASH
+
+# Remove the token from the Proxmox host only after verifying the copy.
 unset GITHUB_TOKEN
 rm -f "$TMP_TOKEN" "$AUTH_FILE"
 AUTH_FILE=""
 TMP_TOKEN=""
 
-progress 60 "Bootstrap privé transféré"
+progress 60 "Bootstrap privé vérifié"
 
 # Keep bootstrap output separate from the earlier (successful) LXC boot trace.
 # Both logs may contain operational details and remain root-readable only.
