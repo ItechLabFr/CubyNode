@@ -140,7 +140,6 @@ Before transferring and running the bootstrap, the Proxmox installer checks DNS 
 - `security.debian.org`
 - `deb.nodesource.com`
 - `github.com`
-- `api.github.com`
 
 The bootstrap performs its own DNS check again and uses APT retries.
 
