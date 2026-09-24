@@ -28,8 +28,6 @@ services:
       CUBYNODE_AGENT_PORT: 8081
       CUBYNODE_DOCKER_SOCKET: /var/run/docker.sock
       CUBYNODE_METRICS_ROOT: /host
-      # Mount an Incus Unix socket separately on hosts that provide Incus/LXC:
-      # CUBYNODE_INCUS_SOCKET: /var/lib/incus/unix.socket
     pid: host
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -52,6 +50,7 @@ services:
       CUBYNODE_AGENT_URLS: http://agent:8081
       CUBYNODE_API_PORT: 8080
       CUBYNODE_SYNC_INTERVAL_MS: 5000
+      CUBYNODE_INSTALL_MODE: docker
       CUBYNODE_VERSION: 1.0.0-beta.1
     ports:
       - "${CUBYNODE_HTTP_PORT:-8080}:8080"
@@ -61,17 +60,15 @@ services:
       agent:
         condition: service_healthy
 
-  # The only intentionally synthetic workload shipped with beta.1.
-  # It is a real Docker container and all status/log/resource data shown by the panel
-  # comes from Docker Engine rather than a mocked API response.
   demo-minecraft:
+    profiles: ["demo"]
     image: alpine:3.22
     restart: unless-stopped
     command:
       - /bin/sh
       - -c
       - |
-        echo "[demo] CubyNode demo Minecraft workload booting"
+        echo "[demo] CubyNode Docker demo workload booting"
         n=0
         while true; do
           n=$$((n+1))
