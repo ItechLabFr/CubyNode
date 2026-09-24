@@ -12,6 +12,7 @@ ENV_FILE="${CUBYNODE_ENV_FILE:-/etc/cubynode/cubynode.env}"
 STATUS_FILE="${CUBYNODE_UPDATE_STATUS:-/var/lib/cubynode/update-status.json}"
 LOG_FILE="${CUBYNODE_UPDATE_LOG:-/var/log/cubynode/update.log}"
 CHANNEL="${CUBYNODE_UPDATE_CHANNEL:-main}"
+PUBLIC_REPO_URL="${CUBYNODE_REPO_URL:-https://github.com/ItechLabFr/CubyNode.git}"
 LOCK_FILE="/run/cubynode-update.lock"
 
 install -d -o root -g cubynode -m 0750 "$(dirname "$STATUS_FILE")" "$(dirname "$LOG_FILE")"
@@ -81,13 +82,23 @@ json_status "running" "Update started." "$BEFORE" ""
 
 if [[ "$MODE" == "full" ]]; then
   export DEBIAN_FRONTEND=noninteractive
-  apt-get update
-  apt-get -y dist-upgrade
-  apt-get install -y ca-certificates curl git openssh-client sudo postgresql openssl python3 util-linux
+  export LANG=C.UTF-8
+  export LC_ALL=C.UTF-8
+  apt-get -o Acquire::Retries=5 update
+  apt-get -o Acquire::Retries=5 -y dist-upgrade
+  apt-get -o Acquire::Retries=5 install -y ca-certificates curl git sudo postgresql openssl python3 util-linux
 fi
+
+echo "Using public CubyNode repository: $PUBLIC_REPO_URL"
+runuser -u cubynode -- git -C "$REPO_DIR" remote set-url origin "$PUBLIC_REPO_URL"
+runuser -u cubynode -- git -C "$REPO_DIR" config --unset-all core.sshCommand 2>/dev/null || true
 
 echo "Fetching CubyNode channel: $CHANNEL"
 runuser -u cubynode -- git -C "$REPO_DIR" fetch --prune origin "$CHANNEL"
+
+# Pre-public installations may still have a CubyNode Deploy Key. It is no
+# longer needed once an HTTPS fetch has succeeded.
+rm -f /var/lib/cubynode/github_deploy_key /var/lib/cubynode/github_deploy_key.pub /etc/cubynode/github_known_hosts
 AFTER="$(runuser -u cubynode -- git -C "$REPO_DIR" rev-parse "origin/$CHANNEL")"
 
 if [[ "$BEFORE" == "$AFTER" && "$MODE" == "simple" ]]; then

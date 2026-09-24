@@ -4,6 +4,19 @@ All notable changes to this project are documented here.
 
 The project follows Semantic Versioning.
 
+## [Unreleased]
+
+### Public repository hardening
+
+- Switched Proxmox installation and updates to public HTTPS Git access.
+- Removed the temporary GitHub PAT, private-clone helper and read-only Deploy Key lifecycle.
+- Simplified the Proxmox installer to a token-free public bootstrap.
+- Kept VLAN 10 + DHCP as the default LXC network.
+- Added Debian/NodeSource/GitHub DNS preflight and APT retries.
+- Added a CI security scan for common committed secret formats and unexpected personal e-mail addresses.
+- Hardened ignored local secret/key file patterns.
+- Set the native LXC bootstrap locale to `C.UTF-8` before PostgreSQL installation.
+
 ## [1.0.0-beta.1] - 2026-09-22
 
 ### Project start

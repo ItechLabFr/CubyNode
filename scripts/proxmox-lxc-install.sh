@@ -4,7 +4,7 @@ set -Eeuo pipefail
 OWNER="ItechLabFr"
 REPO="CubyNode"
 CHANNEL="${CUBYNODE_UPDATE_CHANNEL:-main}"
-API="https://api.github.com/repos/$OWNER/$REPO"
+RAW_BASE="https://raw.githubusercontent.com/$OWNER/$REPO"
 VERSION_LABEL="1.0.0-beta.1"
 
 DEFAULT_DISK_GB=20
@@ -28,14 +28,10 @@ else
   CYAN=""; BLUE=""; GREEN=""; RED=""; BOLD=""; DIM=""; RESET=""
 fi
 
-AUTH_FILE=""
 TMP_BOOTSTRAP=""
-TMP_TOKEN=""
-GITHUB_TOKEN=""
 
 cleanup() {
-  rm -f "${AUTH_FILE:-}" "${TMP_BOOTSTRAP:-}" "${TMP_TOKEN:-}"
-  unset GITHUB_TOKEN CUBYNODE_GITHUB_TOKEN
+  rm -f "${TMP_BOOTSTRAP:-}"
 }
 trap cleanup EXIT
 
@@ -93,17 +89,6 @@ step() {
 }
 
 ok() { $TUI || printf '      %s✓%s %s\n' "$GREEN" "$RESET" "$1"; }
-
-password_box() {
-  local text="$1" value
-  if $TUI; then
-    value="$(whiptail --title "CubyNode • GitHub privé" --passwordbox "$text" 12 76 3>&1 1>/dev/tty 2>&3 </dev/tty)" || exit 130
-  else
-    read -r -s -p "GitHub token: " value </dev/tty
-    echo
-  fi
-  printf '%s' "$value"
-}
 
 storage_menu() {
   local title="$1" content="$2"; shift 2
@@ -173,7 +158,7 @@ progress() {
 
 github_raw() {
   local file="$1" output="$2"
-  curl -fsSL     -H @"$AUTH_FILE"     -H "Accept: application/vnd.github.raw+json"     "$API/contents/$file?ref=$CHANNEL"     -o "$output" >>"$LOG_FILE" 2>&1
+  curl -fsSL --retry 4 --retry-delay 2 --retry-all-errors     "$RAW_BASE/$CHANNEL/$file"     -o "$output" >>"$LOG_FILE" 2>&1
 }
 
 [[ "${EUID}" -eq 0 ]] || die "Lance ce script en root sur le host Proxmox VE."
@@ -183,22 +168,9 @@ done
 
 banner
 
-step 1 6 "Accès au dépôt privé" "Le PAT est temporaire et sera remplacé par une Deploy Key GitHub read-only."
-if [[ -n "${CUBYNODE_GITHUB_TOKEN_FILE:-}" && -r "$CUBYNODE_GITHUB_TOKEN_FILE" ]]; then
-  GITHUB_TOKEN="$(cat "$CUBYNODE_GITHUB_TOKEN_FILE")"
-elif [[ -n "${CUBYNODE_GITHUB_TOKEN:-}" ]]; then
-  GITHUB_TOKEN="$CUBYNODE_GITHUB_TOKEN"
-else
-  GITHUB_TOKEN="$(password_box "Fine-grained PAT pour $OWNER/$REPO\n\nContents: Read-only\nAdministration: Read/Write")"
-fi
-unset CUBYNODE_GITHUB_TOKEN
-[[ -n "$GITHUB_TOKEN" ]] || die "Le token GitHub est requis tant que le dépôt est privé."
-
-AUTH_FILE="$(mktemp /tmp/cubynode-github-auth.XXXXXX)"
-chmod 0600 "$AUTH_FILE"
-printf 'Authorization: Bearer %s\n' "$GITHUB_TOKEN" >"$AUTH_FILE"
-curl -fsSL -H @"$AUTH_FILE" -H "Accept: application/vnd.github+json" "$API" >/dev/null 2>>"$LOG_FILE"   || die "Le token ne permet pas d'accéder à $OWNER/$REPO."
-ok "Dépôt privé accessible"
+step 1 6 "Dépôt public CubyNode" "Aucun token GitHub n'est requis."
+curl -fsSL --retry 4 --retry-delay 2 --retry-all-errors   "$RAW_BASE/$CHANNEL/scripts/lxc-bootstrap.sh"   -o /dev/null 2>>"$LOG_FILE"   || die "Impossible d'accéder au dépôt public $OWNER/$REPO sur la branche $CHANNEL."
+ok "Dépôt public accessible"
 
 step 2 6 "Stockage du template" "Détection des stockages Proxmox compatibles LXC."
 mapfile -t TEMPLATE_STORAGES < <(pvesm status -content vztmpl 2>/dev/null | awk 'NR>1 && $3=="active"{print $1}')
@@ -332,7 +304,7 @@ progress 35 "Premier démarrage réussi"
 # GitHub connectivity alone is not sufficient: apt needs Debian mirrors, too.
 # Check every download host before any changes inside the CT. DNS might still
 # become unavailable later, so lxc-bootstrap.sh also checks and retries apt.
-DNS_PREFLIGHT='for host in deb.debian.org security.debian.org deb.nodesource.com github.com api.github.com; do getent ahostsv4 "$host" >/dev/null 2>&1 || { echo "DNS unavailable: $host" >&2; exit 1; }; done'
+DNS_PREFLIGHT='for host in deb.debian.org security.debian.org deb.nodesource.com github.com; do getent ahostsv4 "$host" >/dev/null 2>&1 || { echo "DNS unavailable: $host" >&2; exit 1; }; done'
 DNS_READY=false
 for _ in {1..30}; do
   if pct exec "$CTID" -- sh -c "$DNS_PREFLIGHT" >>"$LOG_FILE" 2>&1; then
@@ -353,49 +325,22 @@ fi
 progress 50 "DNS Debian, NodeSource et GitHub validés"
 
 TMP_BOOTSTRAP="/tmp/cubynode-lxc-bootstrap-$CTID.sh"
-TMP_TOKEN="/tmp/cubynode-github-token-$CTID"
 github_raw "scripts/lxc-bootstrap.sh" "$TMP_BOOTSTRAP"
-printf '%s' "$GITHUB_TOKEN" >"$TMP_TOKEN"
-chmod 0600 "$TMP_TOKEN"
 
-# Proxmox must write both files as the container's root user.
-# Verify that the token really exists and matches before deleting the host copy.
 if ! pct push "$CTID" "$TMP_BOOTSTRAP" /root/cubynode-bootstrap.sh --user root --group root --perms 0755 >>"$LOG_FILE" 2>&1; then
   die "Transfert du script de bootstrap vers le LXC $CTID impossible. Voir : $LOG_FILE"
 fi
-if ! pct push "$CTID" "$TMP_TOKEN" /root/.cubynode-github-token --user root --group root --perms 0600 >>"$LOG_FILE" 2>&1; then
-  die "Transfert du token GitHub vers le LXC $CTID impossible. Voir : $LOG_FILE"
+if ! pct exec "$CTID" -- /bin/sh -c 'test -r /root/cubynode-bootstrap.sh' >>"$LOG_FILE" 2>&1; then
+  die "Le bootstrap public n'est pas lisible dans le LXC $CTID."
 fi
 
-if ! pct exec "$CTID" -- /bin/sh -c 'test -s /root/.cubynode-github-token && test -r /root/cubynode-bootstrap.sh' >>"$LOG_FILE" 2>&1; then
-  die "Le transfert du token GitHub vers le LXC $CTID a échoué. L'installation s'arrête AVANT le bootstrap. Le conteneur reste disponible pour diagnostic."
-fi
-
-# A positive size/readability check alone could still accept an incomplete
-# transfer. Compare content without printing or logging the token itself.
-HOST_TOKEN_HASH="$(sha256sum "$TMP_TOKEN" | awk '{print $1}')"
-CT_TOKEN_HASH="$(pct exec "$CTID" -- sha256sum /root/.cubynode-github-token | awk '{print $1}')"
-if [[ -z "$CT_TOKEN_HASH" || "$HOST_TOKEN_HASH" != "$CT_TOKEN_HASH" ]]; then
-  unset HOST_TOKEN_HASH CT_TOKEN_HASH
-  die "Le token GitHub n'a pas été copié intégralement dans le LXC $CTID."
-fi
-unset HOST_TOKEN_HASH CT_TOKEN_HASH
-
-# Remove the token from the Proxmox host only after verifying the copy.
-unset GITHUB_TOKEN
-rm -f "$TMP_TOKEN" "$AUTH_FILE"
-AUTH_FILE=""
-TMP_TOKEN=""
-
-progress 60 "Bootstrap privé vérifié"
+progress 60 "Bootstrap public transféré"
 
 # Keep bootstrap output separate from the earlier (successful) LXC boot trace.
 # Both logs may contain operational details and remain root-readable only.
 BOOTSTRAP_LOG="/var/log/cubynode-lxc-bootstrap-${CTID}.log"
 install -o root -g root -m 0600 /dev/null "$BOOTSTRAP_LOG"
-# pct exec may inherit CUBYNODE_GITHUB_TOKEN_FILE from the host launcher.
-# Force the in-container path; never pass an ephemeral host /tmp path.
-if ! pct exec "$CTID" -- env CUBYNODE_GITHUB_TOKEN_FILE=/root/.cubynode-github-token CUBYNODE_UPDATE_CHANNEL="$CHANNEL" bash /root/cubynode-bootstrap.sh >"$BOOTSTRAP_LOG" 2>&1; then
+if ! pct exec "$CTID" -- env CUBYNODE_UPDATE_CHANNEL="$CHANNEL" bash /root/cubynode-bootstrap.sh >"$BOOTSTRAP_LOG" 2>&1; then
   # Read only bootstrap errors: old LXC first-boot debug lines are irrelevant
   # once the container has started and transferred the bootstrap script.
   BOOTSTRAP_ERROR="$(grep -iE '(^E:|error|failed|fatal|denied|could not|not found|unable|refused|unsupported|timed out|invalid)' "$BOOTSTRAP_LOG" | tail -n 8 || true)"
@@ -435,7 +380,7 @@ CTID            $CTID
 Hostname        $HOSTNAME
 Disque          $ROOT_STORAGE • $DISK_GB Go
 Template        $LXC_TEMPLATE
-Git             Deploy Key read-only
+Git             Public HTTPS
 
 $CREDENTIALS"
 

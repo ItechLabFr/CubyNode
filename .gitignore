@@ -1,5 +1,13 @@
 .env
+.env.*
+!.env.example
+.npmrc
+.netrc
 node_modules/
 *.log
+*.pem
+*.key
+*.p12
+*.pfx
 .DS_Store
 coverage/
