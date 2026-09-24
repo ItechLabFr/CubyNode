@@ -3,6 +3,7 @@
 ## Functional scope
 
 ### Control plane
+
 - HTTP API + static panel
 - bearer-token authentication
 - PostgreSQL persistence
@@ -10,25 +11,34 @@
 - honest empty states
 
 ### Docker
-- Engine API through Unix socket
-- managed workload discovery by label
-- status, CPU/RAM, mapped ports, logs
+
+- Docker Engine API through the local Unix socket
+- managed workload discovery by `cubynode.managed=true`
+- Minecraft and Discord bot workload labels
+- status, CPU/RAM, mapped ports and logs
 - start / stop / restart
+- host CPU, memory and storage telemetry
 
-### Incus/LXC
-- Incus REST API through Unix socket
-- managed instance discovery via `user.cubynode.managed=true`
-- status + memory usage
-- start / stop / restart
-- no Docker dependency inside LXC
+Docker is the only supported execution backend in the current beta.
 
-Incus application-log streaming is not implemented in beta.1: the API returns 501 instead of fabricating output.
+### Demo profile
 
-### Demo
-`demo-minecraft` is the only demo workload. It is a real Alpine Docker container with CubyNode labels and heartbeat logs. It exercises lifecycle, metrics and logs without inserting fake rows into the API/database.
+The optional `demo` Compose profile contains one real Alpine container named `Demo Minecraft`.
+
+It is **not started by the default production installation**.
+
+To enable it explicitly:
+
+```bash
+docker compose --profile demo up -d
+```
+
+All demo status, logs and resource values still come from Docker Engine. The API does not fabricate workload rows.
 
 ### Security baseline
+
 - separate panel and agent bearer tokens
 - agent port is not published by the provided Compose file
-- runtime sockets are only consumed by the agent
-- browser never accesses Docker/Incus directly
+- Docker socket is consumed only by the agent
+- browser never accesses Docker directly
+- `.env` contains host-generated secrets and is not committed
