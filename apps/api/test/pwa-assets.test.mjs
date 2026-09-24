@@ -23,10 +23,10 @@ test('PWA manifest and official brand assets are wired into the panel',()=>{
     'icons/android-chrome-192x192.png',
     'icons/android-chrome-512x512.png',
     'icons/favicon-32x32.png',
-    'brand/icon-light.png',
-    'brand/icon-dark.png',
-    'brand/logo-light.png',
-    'brand/logo-dark.png',
+    'brand/icon-light.svg',
+    'brand/icon-dark.svg',
+    'brand/logo-light.svg',
+    'brand/logo-dark.svg',
     'favicon.ico'
   ]){
     assert.ok(fs.statSync(fileURLToPath(new URL(file,publicDir))).size>0,`missing/empty brand asset: ${file}`);
@@ -35,8 +35,8 @@ test('PWA manifest and official brand assets are wired into the panel',()=>{
   const html=read('index.html');
   assert.match(html,/manifest\.webmanifest/);
   assert.match(html,/apple-touch-icon/);
-  assert.match(html,/brand\/icon-light\.png/);
-  assert.match(html,/brand\/icon-dark\.png/);
+  assert.match(html,/brand\/icon-light\.svg/);
+  assert.match(html,/brand\/icon-dark\.svg/);
 
   const app=read('app.js');
   assert.match(app,/serviceWorker\.register\("\/service-worker\.js"\)/);
