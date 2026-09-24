@@ -4,69 +4,52 @@
 
 **Current version: `1.0.0-beta.1`**
 
-CubyNode is a self-hosted control plane dedicated to:
+CubyNode is a self-hosted control plane for:
 
 - Minecraft servers
 - Discord bots
 
-Execution backends remain independent:
+Runtime backends remain independent:
 
 - Docker Engine
 - LXC/Incus
 
-The control plane itself can now be installed **natively in a Proxmox VE LXC without Docker**.
+The control plane itself can be installed **natively in a Proxmox VE LXC without Docker**.
 
-## Automatic Proxmox LXC installation
+## Proxmox LXC installation
 
-The repository is currently private. Use a temporary **fine-grained GitHub PAT** restricted to `ItechLabFr/CubyNode` with:
-
-- **Contents: Read-only**
-- **Administration: Read and write** (only needed so the installer can register the permanent read-only Deploy Key)
+The repository is public. **No GitHub token, PAT or Deploy Key is required.**
 
 Run as `root` on the Proxmox VE host:
 
 ```bash
-read -r -s -p "GitHub token: " TOKEN; echo
-TOKEN_FILE="$(mktemp /tmp/cubynode-token.XXXXXX)"
-AUTH_FILE="$(mktemp /tmp/cubynode-auth.XXXXXX)"
-chmod 600 "$TOKEN_FILE" "$AUTH_FILE"
-printf '%s' "$TOKEN" >"$TOKEN_FILE"
-printf 'Authorization: Bearer %s\n' "$TOKEN" >"$AUTH_FILE"
-unset TOKEN
-
-CUBYNODE_GITHUB_TOKEN_FILE="$TOKEN_FILE" \
-bash <(curl -fsSL \
-  -H @"$AUTH_FILE" \
-  -H "Accept: application/vnd.github.raw+json" \
-  -H "X-GitHub-Api-Version: 2026-03-10" \
-  "https://api.github.com/repos/ItechLabFr/CubyNode/contents/scripts/proxmox-lxc-install.sh?ref=main")
-
-rm -f "$TOKEN_FILE" "$AUTH_FILE"
+bash <(curl -fsSL https://raw.githubusercontent.com/ItechLabFr/CubyNode/main/scripts/proxmox-lxc-install.sh)
 ```
-
-The PAT is used only for the initial private-repository bootstrap. The installer generates an **Ed25519 read-only Deploy Key**, registers it on GitHub, switches the repository remote to SSH, then deletes the temporary PAT from the LXC. Future panel updates use only the Deploy Key.
 
 The installer automatically handles:
 
 - next available CTID
 - hostname
 - unprivileged LXC
-- bridge / DHCP networking
+- `nesting=1` before first boot
+- VLAN 10 on the selected Proxmox bridge
+- DHCP networking
 - 2 vCPU
 - 2 GB RAM
 - 512 MB swap
-- latest Debian 13 standard template by default
+- latest compatible Debian 13 standard template
+- host/template architecture matching
 - template download
+- DNS preflight for Debian, NodeSource and GitHub
 - Node.js 24
 - PostgreSQL
-- authenticated clone from the private GitHub repository
-- dedicated read-only GitHub Deploy Key for future updates
+- public HTTPS clone from GitHub
 - systemd services
-- panel + agent tokens
+- panel + agent tokens generated locally
 - startup on boot
 - native updater
 
-The only interactive choices are:
+The interactive choices are:
 
 1. template storage
 2. LXC root-disk storage
@@ -74,7 +57,21 @@ The only interactive choices are:
 
 If only one compatible storage exists, it is selected automatically.
 
-The final URL and panel token are printed at the end and stored inside the LXC at:
+The default network is:
+
+```text
+bridge: first vmbr* bridge
+VLAN:   10
+IPv4:   DHCP
+```
+
+Override the VLAN when needed:
+
+```bash
+CUBYNODE_VLAN_TAG=20 bash <(curl -fsSL https://raw.githubusercontent.com/ItechLabFr/CubyNode/main/scripts/proxmox-lxc-install.sh)
+```
+
+The final URL and panel token are printed at the end and stored root-only inside the LXC:
 
 ```text
 /root/cubynode-credentials
@@ -88,24 +85,21 @@ Native LXC installations expose update controls in **Admin → Mises à jour**.
 
 ### Simple update
 
-- fetch the configured GitHub channel
+- fetch the configured public GitHub channel
 - update the CubyNode source tree
 - install production npm dependencies
-- run syntax/check validation
+- run validation
 - restart the CubyNode agent and API
-- rollback the application tree if the update fails
+- roll back the application tree if the update fails
 
 ### Complete update
 
 Includes the simple update plus:
 
-- `apt update`
-- Debian distribution package upgrade
+- Debian package update
 - required package refresh
 - systemd service refresh
 - updater helper refresh
-
-If Debian reports that a reboot is required, the panel records that state; the installer does not reboot the LXC automatically.
 
 The updater runs as a transient root systemd unit. The web API itself does not receive an unrestricted root shell.
 
@@ -113,13 +107,11 @@ The updater runs as a transient root systemd unit. The web API itself does not r
 
 CubyNode does not seed fake dashboard statistics.
 
-Every node, workload, state, CPU/RAM/storage value, log and activity item displayed by the panel comes from a runtime/agent observation or from PostgreSQL history built from those observations.
+Every node, workload, state, CPU/RAM/storage value, log and activity item displayed by the panel comes from a runtime/agent observation or PostgreSQL history built from those observations.
 
 The Docker Compose development setup contains one intentional demo workload named `Demo Minecraft`. It is a real Docker container and is the only synthetic workload shipped with beta.1.
 
 ## Docker Compose development install
-
-For development/testing on a Docker host:
 
 ```bash
 git clone https://github.com/ItechLabFr/CubyNode.git
@@ -155,6 +147,14 @@ CUBYNODE_AGENT_URLS=http://node-a:8081,http://node-b:8081
 
 Each agent needs a unique `CUBYNODE_NODE_ID`.
 
+## Security
+
+- No GitHub credential is needed for installation or updates.
+- Runtime secrets are generated on the target system and are not committed to this repository.
+- `.env` is ignored; only `.env.example` with placeholders is tracked.
+- The panel credential file is mode `0600` and stored at `/root/cubynode-credentials`.
+- CI runs `scripts/security-scan.sh` to reject common committed secret formats and unexpected personal e-mail addresses.
+
 ## Development
 
 Node.js 24+:
@@ -163,6 +163,7 @@ Node.js 24+:
 npm install
 npm run check
 npm test
+npm run security:scan
 ```
 
 Documentation:
