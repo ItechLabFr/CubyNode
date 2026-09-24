@@ -16,6 +16,7 @@ The project follows Semantic Versioning.
 - Added a CI security scan for common committed secret formats and unexpected personal e-mail addresses.
 - Hardened ignored local secret/key file patterns.
 - Set the native LXC bootstrap locale to `C.UTF-8` before PostgreSQL installation.
+- Force Node.js/npm commands to run from `/opt/cubynode` with an accessible HOME/cache instead of inheriting `/root` as the working directory.
 
 ## [1.0.0-beta.1] - 2026-09-22
 

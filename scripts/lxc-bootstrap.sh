@@ -48,6 +48,14 @@ if ! id cubynode >/dev/null 2>&1; then
   useradd --system --home-dir "$INSTALL_DIR" --shell /usr/sbin/nologin cubynode
 fi
 install -d -o root -g cubynode -m 0750 "$ENV_DIR" "$STATE_DIR" "$LOG_DIR"
+install -d -o cubynode -g cubynode -m 0750 "$STATE_DIR/npm-cache"
+
+run_cubynode_repo() {
+  runuser -u cubynode -- env \
+    HOME="$INSTALL_DIR" \
+    npm_config_cache="$STATE_DIR/npm-cache" \
+    sh -c 'cd "$1" && shift && exec "$@"' sh "$INSTALL_DIR" "$@"
+}
 
 # The repository is public: no PAT, deploy key or persistent Git credential is needed.
 if ! runuser -u cubynode -- git ls-remote --exit-code "$REPO_HTTPS" "refs/heads/$CHANNEL" >/dev/null 2>&1; then
@@ -60,8 +68,8 @@ install -d -o cubynode -g cubynode -m 0755 "$INSTALL_DIR"
 runuser -u cubynode -- git clone --branch "$CHANNEL" --single-branch "$REPO_HTTPS" "$INSTALL_DIR"
 runuser -u cubynode -- git -C "$INSTALL_DIR" remote set-url origin "$REPO_HTTPS"
 
-runuser -u cubynode -- npm --prefix "$INSTALL_DIR" install --omit=dev --no-audit --no-fund --package-lock=false
-runuser -u cubynode -- npm --prefix "$INSTALL_DIR" run check
+run_cubynode_repo npm install --omit=dev --no-audit --no-fund --package-lock=false
+run_cubynode_repo npm run check
 
 DB_PASS="$(openssl rand -hex 24)"
 PANEL_TOKEN="$(openssl rand -hex 32)"
@@ -77,7 +85,7 @@ fi
 sudo -u postgres psql -tAc "select 1 from pg_database where datname='cubynode'" | grep -q 1 ||
   sudo -u postgres createdb -O cubynode cubynode
 
-VERSION="$(runuser -u cubynode -- node -p "require('$INSTALL_DIR/package.json').version")"
+VERSION="$(run_cubynode_repo node -p 'require("./package.json").version')"
 cat >"$ENV_FILE" <<ENV
 DATABASE_URL=postgresql://cubynode:$DB_PASS@127.0.0.1:5432/cubynode
 CUBYNODE_PANEL_TOKEN=$PANEL_TOKEN

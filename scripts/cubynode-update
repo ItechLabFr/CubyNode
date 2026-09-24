@@ -56,8 +56,16 @@ os.replace(tmp,path)
 PY
 }
 
+run_cubynode_repo() {
+  install -d -o cubynode -g cubynode -m 0750 /var/lib/cubynode/npm-cache
+  runuser -u cubynode -- env \
+    HOME="$REPO_DIR" \
+    npm_config_cache=/var/lib/cubynode/npm-cache \
+    sh -c 'cd "$1" && shift && exec "$@"' sh "$REPO_DIR" "$@"
+}
+
 current_commit() {
-  runuser -u cubynode -- git -C "$REPO_DIR" rev-parse HEAD 2>/dev/null || true
+  run_cubynode_repo git rev-parse HEAD 2>/dev/null || true
 }
 
 BEFORE="$(current_commit)"
@@ -68,8 +76,8 @@ rollback() {
   local rc=$?
   if [[ "$ROLLBACK_NEEDED" == "1" && -n "$BEFORE" ]]; then
     echo "Update failed; rolling application tree back to $BEFORE"
-    runuser -u cubynode -- git -C "$REPO_DIR" reset --hard "$BEFORE" || true
-    runuser -u cubynode -- npm --prefix "$REPO_DIR" install --omit=dev --no-audit --no-fund --package-lock=false || true
+    run_cubynode_repo git reset --hard "$BEFORE" || true
+    run_cubynode_repo npm install --omit=dev --no-audit --no-fund --package-lock=false || true
     systemctl restart cubynode-agent.service || true
     systemctl restart cubynode-api.service || true
   fi
@@ -90,16 +98,16 @@ if [[ "$MODE" == "full" ]]; then
 fi
 
 echo "Using public CubyNode repository: $PUBLIC_REPO_URL"
-runuser -u cubynode -- git -C "$REPO_DIR" remote set-url origin "$PUBLIC_REPO_URL"
-runuser -u cubynode -- git -C "$REPO_DIR" config --unset-all core.sshCommand 2>/dev/null || true
+run_cubynode_repo git remote set-url origin "$PUBLIC_REPO_URL"
+run_cubynode_repo git config --unset-all core.sshCommand 2>/dev/null || true
 
 echo "Fetching CubyNode channel: $CHANNEL"
-runuser -u cubynode -- git -C "$REPO_DIR" fetch --prune origin "$CHANNEL"
+run_cubynode_repo git fetch --prune origin "$CHANNEL"
 
 # Pre-public installations may still have a CubyNode Deploy Key. It is no
 # longer needed once an HTTPS fetch has succeeded.
 rm -f /var/lib/cubynode/github_deploy_key /var/lib/cubynode/github_deploy_key.pub /etc/cubynode/github_known_hosts
-AFTER="$(runuser -u cubynode -- git -C "$REPO_DIR" rev-parse "origin/$CHANNEL")"
+AFTER="$(run_cubynode_repo git rev-parse "origin/$CHANNEL")"
 
 if [[ "$BEFORE" == "$AFTER" && "$MODE" == "simple" ]]; then
   json_status "success" "CubyNode is already up to date." "$BEFORE" "$AFTER"
@@ -107,9 +115,9 @@ if [[ "$BEFORE" == "$AFTER" && "$MODE" == "simple" ]]; then
 fi
 
 ROLLBACK_NEEDED=1
-runuser -u cubynode -- git -C "$REPO_DIR" reset --hard "origin/$CHANNEL"
-runuser -u cubynode -- npm --prefix "$REPO_DIR" install --omit=dev --no-audit --no-fund --package-lock=false
-runuser -u cubynode -- npm --prefix "$REPO_DIR" run check
+run_cubynode_repo git reset --hard "origin/$CHANNEL"
+run_cubynode_repo npm install --omit=dev --no-audit --no-fund --package-lock=false
+run_cubynode_repo npm run check
 
 if [[ "$MODE" == "full" ]]; then
   install -o root -g root -m 0755 "$REPO_DIR/scripts/cubynode-update" /usr/local/sbin/cubynode-update
@@ -119,7 +127,7 @@ if [[ "$MODE" == "full" ]]; then
   systemctl daemon-reload
 fi
 
-VERSION="$(runuser -u cubynode -- node -p "require('$REPO_DIR/package.json').version")"
+VERSION="$(run_cubynode_repo node -p 'require("./package.json").version')"
 if grep -q '^CUBYNODE_VERSION=' "$ENV_FILE"; then
   sed -i "s/^CUBYNODE_VERSION=.*/CUBYNODE_VERSION=$VERSION/" "$ENV_FILE"
 else
