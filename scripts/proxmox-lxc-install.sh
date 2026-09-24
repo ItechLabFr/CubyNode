@@ -304,7 +304,7 @@ progress 35 "Premier démarrage réussi"
 # GitHub connectivity alone is not sufficient: apt needs Debian mirrors, too.
 # Check every download host before any changes inside the CT. DNS might still
 # become unavailable later, so lxc-bootstrap.sh also checks and retries apt.
-DNS_PREFLIGHT='for host in deb.debian.org security.debian.org deb.nodesource.com github.com api.github.com; do getent ahostsv4 "$host" >/dev/null 2>&1 || { echo "DNS unavailable: $host" >&2; exit 1; }; done'
+DNS_PREFLIGHT='for host in deb.debian.org security.debian.org deb.nodesource.com github.com; do getent ahostsv4 "$host" >/dev/null 2>&1 || { echo "DNS unavailable: $host" >&2; exit 1; }; done'
 DNS_READY=false
 for _ in {1..30}; do
   if pct exec "$CTID" -- sh -c "$DNS_PREFLIGHT" >>"$LOG_FILE" 2>&1; then
