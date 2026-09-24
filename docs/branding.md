@@ -38,17 +38,17 @@ The product UI may continue using its existing cyan accent tokens where necessar
 
 Repository / documentation assets:
 
-- `assets/brand/logo-light.png`
-- `assets/brand/logo-dark.png`
-- `assets/brand/icon-light.png`
-- `assets/brand/icon-dark.png`
+- `assets/brand/logo-light.svg`
+- `assets/brand/logo-dark.svg`
+- `assets/brand/icon-light.svg`
+- `assets/brand/icon-dark.svg`
 
 Panel assets:
 
-- `apps/api/public/brand/logo-light.png`
-- `apps/api/public/brand/logo-dark.png`
-- `apps/api/public/brand/icon-light.png`
-- `apps/api/public/brand/icon-dark.png`
+- `apps/api/public/brand/logo-light.svg`
+- `apps/api/public/brand/logo-dark.svg`
+- `apps/api/public/brand/icon-light.svg`
+- `apps/api/public/brand/icon-dark.svg`
 
 Application / PWA icons:
 
@@ -79,3 +79,8 @@ The panel switches the icon automatically with the active UI theme.
 - Keep clear space around the mark.
 - Prefer the icon-only asset at small sizes.
 - Prefer the horizontal wordmark for documentation, landing pages and wide headers.
+
+
+### Source of truth
+
+The primary wordmarks and UI brand icons are SVG files. This avoids binary-encoding failures and keeps the logo sharp at every scale. PNG files under `apps/api/public/icons/` are reserved for platform/PWA icon formats that require raster assets.
