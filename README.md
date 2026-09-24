@@ -1,6 +1,11 @@
 # CubyNode
 
-> **Working title** — the final product name is intentionally not fixed yet.
+<p align="center">
+  <img src="assets/brand/logo-light.png#gh-light-mode-only" alt="CubyNode" width="560">
+  <img src="assets/brand/logo-dark.png#gh-dark-mode-only" alt="CubyNode" width="560">
+</p>
+
+<p align="center"><strong>Self-hosted control plane for Minecraft servers and Discord bots.</strong><br><a href="https://cubynode.fr">cubynode.fr</a></p>
 
 **Current version: `1.0.0-beta.1`**
 
