@@ -317,3 +317,25 @@ cat /var/log/cubynode/update.log
 - The update helper is root-owned and validates the requested mode.
 - No Docker socket is required by the control-plane LXC itself.
 - CI scans tracked content for common secret formats and unexpected personal e-mail addresses.
+
+
+## Node/npm reports /root/package.json permission denied
+
+If the bootstrap reaches Node.js/npm but reports:
+
+```text
+Cannot read package config /root/package.json: permission denied
+ERR_INVALID_PACKAGE_CONFIG
+```
+
+the CT itself is healthy. The failure means a command was dropped to the `cubynode` user while still inheriting root's working directory.
+
+Current bootstrap/update scripts explicitly run Node.js and npm from:
+
+```text
+/opt/cubynode
+```
+
+with `HOME=/opt/cubynode` and an npm cache under `/var/lib/cubynode/npm-cache`. The systemd services already use `WorkingDirectory=/opt/cubynode`.
+
+For a CT created by an older installer, keep the CT and rerun the current public bootstrap rather than recreating the container.
