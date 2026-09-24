@@ -81,9 +81,11 @@ json_status "running" "Update started." "$BEFORE" ""
 
 if [[ "$MODE" == "full" ]]; then
   export DEBIAN_FRONTEND=noninteractive
-  apt-get update
-  apt-get -y dist-upgrade
-  apt-get install -y ca-certificates curl git openssh-client sudo postgresql openssl python3 util-linux
+  export LANG=C.UTF-8
+  export LC_ALL=C.UTF-8
+  apt-get -o Acquire::Retries=5 update
+  apt-get -o Acquire::Retries=5 -y dist-upgrade
+  apt-get -o Acquire::Retries=5 install -y ca-certificates curl git sudo postgresql openssl python3 util-linux
 fi
 
 echo "Fetching CubyNode channel: $CHANNEL"
