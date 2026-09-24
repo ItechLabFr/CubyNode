@@ -18,6 +18,7 @@ jobs:
         with:
           node-version: 24
       - run: bash scripts/security-scan.sh
+      - run: bash scripts/docker-first-check.sh
       - run: npm install --no-audit --no-fund
       - run: npm run check
       - run: npm test
