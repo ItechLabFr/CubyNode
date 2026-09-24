@@ -13,6 +13,7 @@ The project follows Semantic Versioning.
 - Added Apple touch, Android launcher, favicon and PWA icon assets.
 - Added installable PWA metadata and a conservative service worker that excludes API traffic.
 - Switched the panel brand icon automatically with the active light/dark theme.
+- Fixed README logo rendering in GitHub mobile by using a theme-aware `<picture>` element with explicit raw-image fallbacks.
 
 
 ### Public repository hardening

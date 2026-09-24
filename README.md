@@ -1,8 +1,11 @@
 # CubyNode
 
 <p align="center">
-  <img src="assets/brand/logo-light.png#gh-light-mode-only" alt="CubyNode" width="560">
-  <img src="assets/brand/logo-dark.png#gh-dark-mode-only" alt="CubyNode" width="560">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ItechLabFr/CubyNode/main/assets/brand/logo-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/ItechLabFr/CubyNode/main/assets/brand/logo-light.png">
+    <img src="https://raw.githubusercontent.com/ItechLabFr/CubyNode/main/assets/brand/logo-light.png" alt="CubyNode" width="560">
+  </picture>
 </p>
 
 <p align="center"><strong>Self-hosted control plane for Minecraft servers and Discord bots.</strong><br><a href="https://cubynode.fr">cubynode.fr</a></p>
