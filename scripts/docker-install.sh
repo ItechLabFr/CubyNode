@@ -32,7 +32,7 @@ if [[ -n "${CUBYNODE_HTTP_PORT:-}" && ! -f .env ]]; then
   export CUBYNODE_HTTP_PORT
 fi
 
-./scripts/install.sh
+bash ./scripts/install.sh
 
 echo
 echo "CubyNode Docker installation complete."
