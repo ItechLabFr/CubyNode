@@ -10,9 +10,10 @@
     "start:api": "node apps/api/src/server.mjs",
     "start:agent": "node apps/agent/src/server.mjs",
     "test": "node --test apps/api/test/*.test.mjs apps/agent/test/*.test.mjs",
-    "check": "node --check apps/api/src/server.mjs && node --check apps/api/src/update-service.mjs && node --check apps/agent/src/server.mjs && node --check apps/api/public/app.js && node --check apps/api/public/service-worker.js && bash -n scripts/proxmox-lxc-install.sh scripts/lxc-bootstrap.sh scripts/cubynode-update scripts/cubynode-update-request scripts/security-scan.sh",
+    "check": "node --check apps/api/src/server.mjs && node --check apps/agent/src/server.mjs && node --check apps/api/public/app.js && node --check apps/api/public/service-worker.js && bash -n scripts/install.sh scripts/docker-install.sh scripts/docker-update.sh scripts/docker-first-check.sh scripts/security-scan.sh",
     "dev": "docker compose up --build",
-    "security:scan": "bash scripts/security-scan.sh"
+    "security:scan": "bash scripts/security-scan.sh",
+    "docker:first": "bash scripts/docker-first-check.sh"
   },
   "dependencies": {
     "pg": "8.23.0"

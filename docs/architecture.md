@@ -1,204 +1,114 @@
 # Architecture
 
-## Scope
+## Current scope
 
-The platform manages only two product families:
+CubyNode currently targets two workload families:
 
 - Minecraft servers
 - Discord bots
 
-A workload can be deployed on a compatible node using either Docker or Incus/LXC according to the selected template and node capabilities.
+**Docker Engine is the only execution backend supported by the current beta.**
 
 ## Components
 
-### 1. Web Panel
+### Web Panel
 
 Responsibilities:
 
-- authentication and account management
-- server/bot creation wizard
+- authentication
+- workload overview
 - console and logs
-- file manager
-- backups
-- schedules
-- environment variables and secrets
 - resource graphs
-- sub-users and permissions
-- administrative node management
+- node status
+- administrative information
 
-The panel must never talk directly to Docker or Incus.
+The browser never talks directly to the Docker socket.
 
-### 2. Control Plane API
+### Control Plane API
 
 The API is the authoritative application layer.
 
 Responsibilities:
 
-- users, teams and permissions
-- workload state
-- templates
-- scheduling and placement
-- quotas
-- audit events
-- backup metadata
-- secret references
-- node registration and health
+- workload and node state
+- PostgreSQL history
+- agent synchronization
+- lifecycle requests
+- activity events
+- authentication
 
-### 3. Node Agent
+### Node Agent
 
-A small agent runs on every execution node.
+The agent runs in Docker on every managed node.
 
 Responsibilities:
 
-- register node capabilities
-- report CPU, memory, disk and network usage
-- receive signed workload operations
-- stream console/log events
-- execute runtime operations through a runtime driver
-- manage local files and backup streams
+- report node CPU, memory and storage
+- detect CubyNode-managed Docker containers
+- read Docker stats and logs
+- start, stop and restart managed containers
 
-The control plane communicates with the agent; the control plane does not expose Docker or Incus sockets over the public network.
+The Docker Unix socket is mounted only into the agent container. It is not exposed over the network.
 
-## Runtime abstraction
+## Docker runtime
 
-The core must expose one internal contract, for example:
+CubyNode communicates with Docker Engine through the local versioned Engine API.
 
-```text
-RuntimeDriver
-├── Capabilities()
-├── CreateInstance(spec)
-├── Start(id)
-├── Stop(id)
-├── Restart(id)
-├── Delete(id)
-├── Inspect(id)
-├── Stats(id)
-├── Logs(id)
-├── Exec(id, command)
-├── Upload(id, path, stream)
-├── Download(id, path)
-├── Snapshot(id)
-└── Restore(id, snapshot)
-```
-
-### Docker driver
-
-The Docker backend communicates with Docker Engine through its versioned Engine API.
-
-Primary mapping:
+Current mapping:
 
 - workload -> Docker container
-- persistent data -> volumes/bind mounts
-- allocations -> Docker networks/port bindings
-- CPU/RAM/PIDs -> container resource limits
-- logs/console -> attach/log streams
-- templates -> image + environment + mounts + startup configuration
+- status -> Docker container state
+- CPU/RAM -> Docker stats API
+- ports -> Docker port mappings
+- logs -> Docker logs API
+- lifecycle -> Docker start / stop / restart API
+- discovery -> Docker labels
 
-### Incus / LXC driver
-
-LXC support is implemented through **Incus** rather than by shelling out to raw LXC commands.
-
-Primary mapping:
-
-- workload -> Incus system container
-- persistent data -> storage volumes
-- allocations -> proxy/network devices
-- CPU/RAM -> Incus limits
-- console -> Incus console/exec APIs
-- metrics/events -> Incus API streams
-- templates -> image + profile + cloud-init/startup configuration
-
-This gives the project a stable remote API, authentication, events and resource reporting while workloads still run as LXC system containers.
-
-## Workload model
+Managed containers use these labels:
 
 ```text
-Workload
-├── id
-├── kind                 minecraft | discord_bot
-├── runtime              docker | incus
-├── template_id
-├── node_id
-├── state
-├── resources
-│   ├── cpu
-│   ├── memory
-│   ├── disk
-│   └── pids
-├── networking
-├── mounts
-├── startup
-├── environment
-└── secret_refs
+cubynode.managed=true
+cubynode.kind=minecraft | discord_bot
+cubynode.name=...
 ```
 
-The UI should not expose backend-specific complexity unless an administrator explicitly enables advanced settings.
+Optional labels:
 
-## Template model
-
-Templates declare which runtimes they support.
-
-Examples:
-
-```yaml
-id: minecraft-paper
-kind: minecraft
-runtimes:
-  - docker
-  - incus
-resources:
-  memory_min: 1024
-startup:
-  command: java -Xms128M -Xmx{{memory}}M -jar server.jar nogui
+```text
+cubynode.template=...
+cubynode.demo=true
 ```
 
-Discord templates can follow the same model for Node.js, Python, Java and Bun.
+## Multi-node
 
-## Suggested node capabilities
+The control plane can synchronize several Docker agents:
 
-Every agent reports a capability document:
-
-```json
-{
-  "runtimes": ["docker", "incus"],
-  "architectures": ["amd64"],
-  "cpu_threads": 16,
-  "memory_bytes": 68719476736,
-  "storage": {
-    "default": {
-      "free_bytes": 800000000000
-    }
-  }
-}
+```env
+CUBYNODE_AGENT_URLS=http://node-a:8081,http://node-b:8081
 ```
 
-The scheduler only places workloads on nodes satisfying the template and resource requirements.
+Each agent must use a unique `CUBYNODE_NODE_ID`.
 
 ## Security baseline
 
-- mutually authenticated control-plane/agent connection
 - no public Docker socket
-- no public Incus Unix socket
-- short-lived operation credentials
-- encrypted secrets at rest
-- secrets redacted from logs
-- per-workload filesystem boundaries
-- resource limits mandatory
-- audit log for administrative operations
-- configurable unprivileged Incus containers by default
-- administrator-only access to privileged modes
+- separate panel and agent bearer tokens
+- runtime secrets generated on the host
+- browser never receives the agent token
+- only containers explicitly labeled `cubynode.managed=true` are managed
+- activity is persisted in PostgreSQL
+- no fabricated runtime statistics
 
-## Initial implementation order
+## Implementation order
 
-1. Core API + authentication
-2. Node registration and heartbeat
-3. Runtime driver interface
-4. Docker driver
-5. Workload lifecycle
-6. Live console/log streaming
-7. Minecraft Paper template
-8. Discord Node.js template
-9. Incus/LXC driver
-10. File manager, backups and schedules
-11. Permissions and audit log
-12. Multi-node scheduler
+1. Docker installation and update flow
+2. Docker node registration and metrics
+3. Docker workload discovery
+4. lifecycle and logs
+5. Minecraft templates
+6. Discord bot templates
+7. workload creation
+8. file manager
+9. backups and schedules
+10. permissions and audit log
+11. multi-node scheduling

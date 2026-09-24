@@ -1,6 +1,6 @@
 <!doctype html><html lang="fr" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><meta name="application-name" content="CubyNode"><meta name="description" content="CubyNode — control plane self-hosted pour serveurs Minecraft et bots Discord."><meta name="theme-color" id="theme-color" content="#0b1120"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="CubyNode"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><title>CubyNode</title><link rel="manifest" href="/manifest.webmanifest"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png"><link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png"><link rel="stylesheet" href="/styles.css"></head><body>
 <div id="auth" class="auth hidden"><form id="auth-form" class="auth-card"><div class="brand brand-large"><span class="logo-wrap"><img class="brand-icon brand-icon-light" src="/brand/icon-light.svg" alt=""><img class="brand-icon brand-icon-dark" src="/brand/icon-dark.svg" alt=""></span><span>Cuby<span>Node</span></span></div><h1>Connexion au panel</h1><p>Entre le token d'accès généré lors de l'installation.</p><label>Token d'accès<input id="token-input" type="password" autocomplete="off" required></label><button class="btn primary" type="submit">Se connecter</button><p id="auth-error" class="error-text"></p></form></div>
-<div id="app" class="layout hidden"><aside class="sidebar"><div class="brand"><span class="logo-wrap"><img class="brand-icon brand-icon-light" src="/brand/icon-light.svg" alt=""><img class="brand-icon brand-icon-dark" src="/brand/icon-dark.svg" alt=""></span><span>Cuby<span>Node</span></span></div><p class="brand-sub">Minecraft & Discord Hosting</p><nav><button class="nav-item active" data-view="dashboard">▦ <span>Dashboard</span></button><button class="nav-item" data-view="minecraft">◇ <span>Minecraft</span></button><button class="nav-item" data-view="discord">◉ <span>Bots Discord</span></button><button class="nav-item" data-view="nodes">▤ <span>Nodes</span></button><button class="nav-item" data-view="admin">⚙ <span>Admin</span></button></nav><div class="sidebar-bottom"><div class="runtime-note">Docker + Incus/LXC<br><small>Données runtime réelles</small></div><div class="version">v<span id="version">1.0.0-beta.1</span></div></div></aside>
+<div id="app" class="layout hidden"><aside class="sidebar"><div class="brand"><span class="logo-wrap"><img class="brand-icon brand-icon-light" src="/brand/icon-light.svg" alt=""><img class="brand-icon brand-icon-dark" src="/brand/icon-dark.svg" alt=""></span><span>Cuby<span>Node</span></span></div><p class="brand-sub">Minecraft & Discord Hosting</p><nav><button class="nav-item active" data-view="dashboard">▦ <span>Dashboard</span></button><button class="nav-item" data-view="minecraft">◇ <span>Minecraft</span></button><button class="nav-item" data-view="discord">◉ <span>Bots Discord</span></button><button class="nav-item" data-view="nodes">▤ <span>Nodes</span></button><button class="nav-item" data-view="admin">⚙ <span>Admin</span></button></nav><div class="sidebar-bottom"><div class="runtime-note">Docker Engine<br><small>Données runtime réelles</small></div><div class="version">v<span id="version">1.0.0-beta.1</span></div></div></aside>
 <main><header class="topbar"><div><p class="eyebrow">CONTROL PLANE</p><h1 id="page-title">Dashboard</h1></div><div class="top-actions"><span id="last-sync" class="muted">Synchronisation…</span><button id="sync-btn" class="icon-btn" title="Synchroniser">↻</button><button id="theme-btn" class="icon-btn" title="Thème">☾</button><button id="logout-btn" class="icon-btn" title="Déconnexion">⇥</button></div></header>
 <section id="dashboard-view" class="view"><div class="summary-grid"><article class="stat-card"><span>Instances</span><strong id="total-instances">—</strong><small>Minecraft + Discord</small></article><article class="stat-card"><span>Services en ligne</span><strong id="online-services">—</strong><small id="online-ratio">—</small></article><article class="stat-card"><span>Nodes</span><strong id="node-count">—</strong><small id="online-nodes">—</small></article><article class="stat-card"><span>Uptime observé</span><strong id="uptime">—</strong><small>Télémétrie réellement collectée</small></article></div>
 <div class="dashboard-grid"><article class="panel resource-panel"><div class="panel-head"><div><h2>Ressources</h2><p>Historique réel des nodes</p></div><div class="resource-now"><span>CPU <b id="cpu-now">—</b></span><span>RAM <b id="ram-now">—</b></span><span>Disque <b id="disk-now">—</b></span></div></div><svg id="chart" class="chart" viewBox="0 0 900 260" preserveAspectRatio="none"></svg><div class="legend"><span class="cpu-dot">CPU</span><span class="ram-dot">RAM</span><span class="disk-dot">Stockage</span></div></article>
@@ -13,26 +13,19 @@
 <section id="admin-view" class="view hidden">
   <div class="admin-grid">
     <article class="panel">
-      <div class="panel-head"><div><h2>Mises à jour</h2><p>Mise à jour native du LXC CubyNode depuis GitHub</p></div><span id="update-badge" class="badge">—</span></div>
+      <div class="panel-head"><div><h2>Déploiement Docker</h2><p>Mode officiel de CubyNode</p></div><span class="badge running">Docker</span></div>
       <div class="update-facts">
-        <div><span>Installation</span><strong id="update-install-mode">—</strong></div>
-        <div><span>Canal</span><strong id="update-channel">—</strong></div>
-        <div><span>Version</span><strong id="update-version">—</strong></div>
-        <div><span>Commit actuel</span><strong id="update-current">—</strong></div>
-        <div><span>Commit distant</span><strong id="update-remote">—</strong></div>
-        <div><span>Dernière opération</span><strong id="update-state">—</strong></div>
+        <div><span>Runtime</span><strong>Docker Engine</strong></div>
+        <div><span>Orchestration</span><strong>Docker Compose v2</strong></div>
+        <div><span>Base de données</span><strong>PostgreSQL 17</strong></div>
+        <div><span>Mise à jour</span><strong>Depuis l'hôte Docker</strong></div>
       </div>
-      <div class="update-actions">
-        <button id="update-simple" class="btn primary">Mise à jour simple</button>
-        <button id="update-full" class="btn">Mise à jour complète</button>
-        <button id="update-refresh" class="btn">Actualiser</button>
-      </div>
-      <p class="update-help"><b>Simple :</b> code CubyNode + dépendances npm + vérifications + redémarrage.<br><b>Complète :</b> mise à jour Debian + CubyNode + services systemd + redémarrage.</p>
-      <div id="update-message" class="notice"></div>
+      <p class="update-help">CubyNode ne donne pas au conteneur API le contrôle du déploiement hôte. Les mises à jour se lancent explicitement sur le serveur Docker.</p>
     </article>
     <article class="panel">
-      <div class="panel-head"><div><h2>Journal de mise à jour</h2><p>Sortie réelle du dernier update</p></div></div>
-      <pre id="update-log" class="console update-log">Aucune opération.</pre>
+      <div class="panel-head"><div><h2>Commande de mise à jour</h2><p>À exécuter sur l'hôte Docker</p></div></div>
+      <pre class="console update-log">sudo bash /opt/cubynode/scripts/docker-update.sh</pre>
+      <p class="update-help">Le fichier <code>.env</code> et ses secrets locaux sont conservés.</p>
     </article>
   </div>
 </section></main></div><div id="toast" class="toast hidden"></div><script type="module" src="/app.js"></script></body></html>

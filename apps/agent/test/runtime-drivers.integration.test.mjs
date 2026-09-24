@@ -5,7 +5,6 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { DockerDriver } from '../src/drivers/docker.mjs';
-import { IncusDriver } from '../src/drivers/incus.mjs';
 
 function tempSocket(name) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cubynode-test-'));
@@ -35,7 +34,7 @@ function dockerFrame(text) {
   return Buffer.concat([header, body]);
 }
 
-test('DockerDriver discovers a managed real-runtime shape and controls it over the Engine API', async () => {
+test('DockerDriver discovers a managed Docker workload and controls it over the Engine API', async () => {
   const { dir, socket } = tempSocket('docker');
   const calls = [];
   const server = http.createServer((req, res) => {
@@ -79,40 +78,3 @@ test('DockerDriver discovers a managed real-runtime shape and controls it over t
   await close(server, dir);
 });
 
-test('IncusDriver discovers only CubyNode-managed LXC instances and issues lifecycle actions', async () => {
-  const { dir, socket } = tempSocket('incus');
-  let stateAction = null;
-  const server = http.createServer((req, res) => {
-    res.setHeader('content-type', 'application/json');
-    if (req.url === '/1.0') return res.end(JSON.stringify({ type: 'sync', metadata: { api_version: '1.0' } }));
-    if (req.url === '/1.0/instances?recursion=2') {
-      return res.end(JSON.stringify({ type: 'sync', metadata: [
-        { name: 'mc-lxc', status: 'Running', created_at: '2026-09-22T00:00:00Z', config: { 'user.cubynode.managed': 'true', 'user.cubynode.kind': 'minecraft', 'user.cubynode.name': 'LXC Minecraft' } },
-        { name: 'other', status: 'Running', config: {} },
-      ] }));
-    }
-    if (req.url === '/1.0/instances/mc-lxc/state' && req.method === 'GET') return res.end(JSON.stringify({ type: 'sync', metadata: { memory: { usage: 4096, usage_peak: 8192 } } }));
-    if (req.url === '/1.0/instances/mc-lxc/state' && req.method === 'PUT') {
-      let body = '';
-      req.on('data', (chunk) => { body += chunk; });
-      req.on('end', () => {
-        stateAction = JSON.parse(body).action;
-        res.end(JSON.stringify({ type: 'async', metadata: { id: 'op-1' } }));
-      });
-      return;
-    }
-    res.writeHead(404); res.end(JSON.stringify({ type: 'error', error: 'not found', error_code: 404 }));
-  });
-
-  await listenUnix(server, socket);
-  const driver = new IncusDriver(socket);
-  assert.equal(await driver.available(), true);
-  const workloads = await driver.listWorkloads();
-  assert.equal(workloads.length, 1);
-  assert.equal(workloads[0].runtime, 'incus');
-  assert.equal(workloads[0].name, 'LXC Minecraft');
-  assert.equal(workloads[0].memoryUsedBytes, 4096);
-  await driver.action('mc-lxc', 'stop');
-  assert.equal(stateAction, 'stop');
-  await close(server, dir);
-});

@@ -1,48 +1,45 @@
 # Changelog
 
-All notable changes to this project are documented here.
+All notable changes to CubyNode are documented here.
 
 The project follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Docker-first beta
+
+- Made Docker Engine the only supported execution backend in the current beta.
+- Added a one-command public Docker installation flow.
+- Added a host-side Docker update script.
+- Made the demo workload opt-in through the `demo` Compose profile.
+- Removed non-Docker runtime code, installers, services, tests and documentation from the current tree.
+- Removed the in-panel native self-updater; Docker deployment updates are executed explicitly on the host.
+- Added a CI guard that keeps the current project tree Docker-only.
+- Kept real Docker Engine status, metrics, logs and lifecycle operations as the source of workload data.
+
 ### Official CubyNode brand
 
 - Confirmed CubyNode as the official product name and `cubynode.fr` as the official domain.
-- Added official light and dark logo/icon variants.
+- Added official light and dark vector logo/icon variants.
 - Added Apple touch, Android launcher, favicon and PWA icon assets.
 - Added installable PWA metadata and a conservative service worker that excludes API traffic.
 - Switched the panel brand icon automatically with the active light/dark theme.
-- Fixed README logo rendering in GitHub mobile by using a theme-aware `<picture>` element with explicit raw-image fallbacks.
-- Replaced invalid/empty brand PNG wordmarks with real SVG source assets for reliable GitHub and panel rendering.
-
+- Fixed README logo rendering on GitHub mobile.
 
 ### Public repository hardening
 
-- Switched Proxmox installation and updates to public HTTPS Git access.
-- Removed the temporary GitHub PAT, private-clone helper and read-only Deploy Key lifecycle.
-- Simplified the Proxmox installer to a token-free public bootstrap.
-- Kept VLAN 10 + DHCP as the default LXC network.
-- Added Debian/NodeSource/GitHub DNS preflight and APT retries.
+- Switched installation and updates to public HTTPS Git access.
 - Added a CI security scan for common committed secret formats and unexpected personal e-mail addresses.
 - Hardened ignored local secret/key file patterns.
-- Set the native LXC bootstrap locale to `C.UTF-8` before PostgreSQL installation.
-- Force Node.js/npm commands to run from `/opt/cubynode` with an accessible HOME/cache instead of inheriting `/root` as the working directory.
 
 ## [1.0.0-beta.1] - 2026-09-22
 
 ### Project start
 
 - Established `1.0.0-beta.1` as the first official project version.
-- Defined the product scope around Minecraft server hosting and Discord bot hosting only.
-- Defined a runtime-agnostic architecture.
-- Added Docker as a first-class execution backend.
-- Added Incus/LXC as a first-class execution backend.
-- Confirmed that Docker and LXC are independent runtimes; Docker is not required inside LXC workloads.
-- Defined the initial control-plane, node-agent and scheduler architecture.
-- Added the provisional runtime-neutral logo and branding direction.
-- Added automatic native Proxmox VE LXC installation from GitHub.
-- Added a native LXC bootstrap with Node.js 24, PostgreSQL and systemd services.
-- Added admin-panel simple and complete update flows.
-- Added application rollback for failed native code updates.
-- Added private GitHub bootstrap using a temporary fine-grained PAT and persistent read-only Deploy Key.
+- Defined the product scope around Minecraft server hosting and Discord bot hosting.
+- Added Docker Engine as the initial execution backend.
+- Added the control-plane API, PostgreSQL persistence and node agent.
+- Added real Docker workload discovery through labels.
+- Added Docker status, CPU/RAM, mapped ports, logs and start/stop/restart actions.
+- Added the initial self-hosted panel and multi-node synchronization model.
