@@ -6,6 +6,15 @@ The project follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Official CubyNode brand
+
+- Confirmed CubyNode as the official product name and `cubynode.fr` as the official domain.
+- Added official light and dark logo/icon variants.
+- Added Apple touch, Android launcher, favicon and PWA icon assets.
+- Added installable PWA metadata and a conservative service worker that excludes API traffic.
+- Switched the panel brand icon automatically with the active light/dark theme.
+
+
 ### Public repository hardening
 
 - Switched Proxmox installation and updates to public HTTPS Git access.
