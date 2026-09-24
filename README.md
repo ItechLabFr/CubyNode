@@ -68,7 +68,7 @@ curl -fsSL https://raw.githubusercontent.com/ItechLabFr/CubyNode/main/scripts/do
 Run on the Docker host:
 
 ```bash
-sudo /opt/cubynode/scripts/docker-update.sh
+sudo bash /opt/cubynode/scripts/docker-update.sh
 ```
 
 This keeps the local `.env`, updates the source from the configured public branch, rebuilds the CubyNode containers and restarts the stack.
@@ -78,7 +78,7 @@ This keeps the local `.env`, updates the source from the configured public branc
 ```bash
 git clone https://github.com/ItechLabFr/CubyNode.git
 cd CubyNode
-./scripts/install.sh
+bash ./scripts/install.sh
 ```
 
 ## Managed Docker workloads
