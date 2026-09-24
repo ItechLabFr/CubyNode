@@ -2,7 +2,6 @@ import crypto from 'node:crypto';
 import http from 'node:http';
 import { URL } from 'node:url';
 import { DockerDriver } from './drivers/docker.mjs';
-import { IncusDriver } from './drivers/incus.mjs';
 import { collectNodeMetrics } from './metrics.mjs';
 
 const port = Number(process.env.CUBYNODE_AGENT_PORT || 8081);
@@ -17,7 +16,6 @@ if (!token) {
 }
 
 const docker = new DockerDriver(process.env.CUBYNODE_DOCKER_SOCKET || '/var/run/docker.sock');
-const incus = new IncusDriver(process.env.CUBYNODE_INCUS_SOCKET || '/var/lib/incus/unix.socket');
 
 function json(response, statusCode, payload) {
   const body = JSON.stringify(payload);
@@ -38,32 +36,15 @@ function authorized(request) {
 }
 
 async function capabilities() {
-  const [dockerAvailable, incusAvailable] = await Promise.all([docker.available(), incus.available()]);
+  const dockerAvailable = await docker.available();
   return {
-    runtimes: [
-      ...(dockerAvailable ? ['docker'] : []),
-      ...(incusAvailable ? ['incus'] : []),
-    ],
+    runtimes: dockerAvailable ? ['docker'] : [],
     docker: dockerAvailable,
-    incus: incusAvailable,
   };
 }
 
 async function listWorkloads() {
-  const [dockerAvailable, incusAvailable] = await Promise.all([docker.available(), incus.available()]);
-  const results = await Promise.all([
-    dockerAvailable ? docker.listWorkloads() : Promise.resolve([]),
-    incusAvailable ? incus.listWorkloads() : Promise.resolve([]),
-  ]);
-  return results.flat();
-}
-
-function driverFor(runtime) {
-  if (runtime === 'docker') return docker;
-  if (runtime === 'incus') return incus;
-  const error = new Error(`Unknown runtime: ${runtime}`);
-  error.statusCode = 400;
-  throw error;
+  return (await docker.available()) ? docker.listWorkloads() : [];
 }
 
 const server = http.createServer(async (request, response) => {
@@ -93,20 +74,18 @@ const server = http.createServer(async (request, response) => {
       return json(response, 200, { workloads: await listWorkloads() });
     }
 
-    const logsMatch = url.pathname.match(/^\/v1\/workloads\/(docker|incus)\/([^/]+)\/logs$/);
+    const logsMatch = url.pathname.match(/^\/v1\/workloads\/docker\/([^/]+)\/logs$/);
     if (request.method === 'GET' && logsMatch) {
-      const runtime = logsMatch[1];
-      const id = decodeURIComponent(logsMatch[2]);
-      const logs = await driverFor(runtime).logs(id, url.searchParams.get('tail') || 200);
+      const id = decodeURIComponent(logsMatch[1]);
+      const logs = await docker.logs(id, url.searchParams.get('tail') || 200);
       return json(response, 200, { logs });
     }
 
-    const actionMatch = url.pathname.match(/^\/v1\/workloads\/(docker|incus)\/([^/]+)\/(start|stop|restart)$/);
+    const actionMatch = url.pathname.match(/^\/v1\/workloads\/docker\/([^/]+)\/(start|stop|restart)$/);
     if (request.method === 'POST' && actionMatch) {
-      const runtime = actionMatch[1];
-      const id = decodeURIComponent(actionMatch[2]);
-      const action = actionMatch[3];
-      const result = await driverFor(runtime).action(id, action);
+      const id = decodeURIComponent(actionMatch[1]);
+      const action = actionMatch[2];
+      const result = await docker.action(id, action);
       return json(response, 202, result);
     }
 
@@ -118,5 +97,5 @@ const server = http.createServer(async (request, response) => {
 });
 
 server.listen(port, '0.0.0.0', () => {
-  console.log(`CubyNode agent ${nodeId} listening on :${port}`);
+  console.log(`CubyNode Docker agent ${nodeId} listening on :${port}`);
 });
