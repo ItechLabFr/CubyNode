@@ -24,6 +24,7 @@ if [ ! -f .env ]; then
     fi
   }
   panel_token="$(random_hex 32)"
+  http_port="${CUBYNODE_HTTP_PORT:-8080}"
   agent_token="$(random_hex 32)"
   postgres_password="$(random_hex 24)"
 
@@ -35,7 +36,7 @@ CUBYNODE_PANEL_TOKEN=${panel_token}
 CUBYNODE_AGENT_TOKEN=${agent_token}
 CUBYNODE_NODE_ID=$(hostname | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9-')
 CUBYNODE_NODE_NAME=$(hostname)
-CUBYNODE_HTTP_PORT=8080
+CUBYNODE_HTTP_PORT=${http_port}
 ENV
   chmod 600 .env
 fi
