@@ -103,7 +103,7 @@ async function routeApi(req,res,url){
   return json(res,404,{error:'not_found'});
 }
 
-const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.json':'application/json; charset=utf-8'};
+const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.ico':'image/x-icon','.webmanifest':'application/manifest+json; charset=utf-8','.json':'application/json; charset=utf-8'};
 async function staticFile(res,pathname){
   const requested=pathname==='/'?'/index.html':pathname;
   const normalized=path.posix.normalize(requested);
@@ -112,7 +112,8 @@ async function staticFile(res,pathname){
   try{
     const data=await fs.readFile(file);
     const ext=path.extname(file);
-    res.writeHead(200,{'Content-Type':mime[ext]||'application/octet-stream','Content-Length':data.length,'Cache-Control':ext==='.html'?'no-cache':'public, max-age=3600','X-Content-Type-Options':'nosniff','Referrer-Policy':'same-origin'});
+    const noCache=ext==='.html'||path.basename(file)==='service-worker.js'||ext==='.webmanifest';
+    res.writeHead(200,{'Content-Type':mime[ext]||'application/octet-stream','Content-Length':data.length,'Cache-Control':noCache?'no-cache':'public, max-age=3600','X-Content-Type-Options':'nosniff','Referrer-Policy':'same-origin'});
     res.end(data);
   }catch(error){
     if(error.code==='ENOENT'){

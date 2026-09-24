@@ -1,20 +1,81 @@
-# Branding direction
+# CubyNode brand
 
-The current repository name **CubyNode** is a working title only.
+**CubyNode** is the official product name.
 
-The visual identity should therefore avoid embedding the product name into the core icon.
+Official domain: **https://cubynode.fr**
 
-## Logo concept
+## Brand idea
 
-The provisional symbol combines three ideas:
+The mark combines two core concepts:
 
 - **cube** — Minecraft, containers and isolated workloads
 - **connected nodes** — Discord bots, networking and multi-node infrastructure
-- **open geometric form** — an orchestration/control layer rather than a closed appliance
 
-The icon must remain recognizable at favicon size and work in monochrome.
+The identity is intentionally simple and infrastructure-oriented rather than mascot-driven.
 
-Files:
+## Naming
 
-- `assets/icon.svg` — primary icon
-- a wordmark will be created only after the final product name is selected
+Always write the product name exactly as:
+
+```text
+CubyNode
+```
+
+Capital **C**, capital **N**.
+
+## Core palette
+
+| Role | Color |
+| --- | --- |
+| Deep navy | `#0B1F3A` |
+| Cyan accent | `#00C7E8` |
+| Dark UI | `#0B1120` |
+| White | `#FFFFFF` |
+
+The product UI may continue using its existing cyan accent tokens where necessary for accessibility and contrast.
+
+## Official assets
+
+Repository / documentation assets:
+
+- `assets/brand/logo-light.png`
+- `assets/brand/logo-dark.png`
+- `assets/brand/icon-light.png`
+- `assets/brand/icon-dark.png`
+
+Panel assets:
+
+- `apps/api/public/brand/logo-light.png`
+- `apps/api/public/brand/logo-dark.png`
+- `apps/api/public/brand/icon-light.png`
+- `apps/api/public/brand/icon-dark.png`
+
+Application / PWA icons:
+
+- `apps/api/public/icons/apple-touch-icon.png` — Apple home screen
+- `apps/api/public/icons/android-chrome-192x192.png`
+- `apps/api/public/icons/android-chrome-512x512.png`
+- `apps/api/public/icons/pwa-192x192.png`
+- `apps/api/public/icons/pwa-512x512.png`
+- `apps/api/public/icons/pwa-maskable-512x512.png`
+- `apps/api/public/icons/favicon-32x32.png`
+- `apps/api/public/favicon.ico`
+
+These are web/PWA application assets. They do not imply that native iOS or Android applications are currently published.
+
+## Light and dark modes
+
+Use the light variant on white or light surfaces.
+
+Use the dark variant on dark navy / charcoal surfaces.
+
+The panel switches the icon automatically with the active UI theme.
+
+## Usage rules
+
+- Keep the cube/node proportions intact.
+- Do not stretch, skew or rotate the mark.
+- Do not recolor individual parts outside the official palette.
+- Keep clear space around the mark.
+- Prefer the icon-only asset at small sizes.
+- Prefer the horizontal wordmark for documentation, landing pages and wide headers.
