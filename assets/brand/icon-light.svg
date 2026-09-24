@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" role="img" aria-label="CubyNode icon">
+  <g fill="#0f172a">
+    <path d="M58 116 146 68v103L58 220z"/>
+    <path d="m174 171 88-55v104l-88 52z"/>
+  </g>
+  <path d="M62 98 160 42l98 56" fill="none" stroke="#0f172a" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M160 156v74l67-39" fill="none" stroke="#06b6d4" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="160" cy="146" r="27" fill="#06b6d4"/>
+  <circle cx="232" cy="188" r="27" fill="#06b6d4"/>
+</svg>
