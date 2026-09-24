@@ -155,6 +155,7 @@ npm run security:scan
 
 Documentation:
 
+- [Docker deployment](docs/docker.md)
 - [Architecture](docs/architecture.md)
 - [Beta 1 contract](docs/beta1.md)
 - [Branding](docs/branding.md)
